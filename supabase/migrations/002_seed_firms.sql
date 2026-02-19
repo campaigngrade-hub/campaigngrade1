@@ -1,0 +1,26 @@
+-- Seed initial firms data
+INSERT INTO firms (name, slug, services, party_focus, is_claimed) VALUES
+('GMMB', 'gmmb', ARRAY['general_consulting', 'media_buying', 'creative', 'video_production'], 'democratic', FALSE),
+('Bully Pulpit Interactive', 'bully-pulpit-interactive', ARRAY['digital_ads', 'media_buying', 'data_analytics'], 'democratic', FALSE),
+('SKDKnickerbocker', 'skdknickerbocker', ARRAY['communications', 'creative', 'media_buying'], 'democratic', FALSE),
+('Precision Strategies', 'precision-strategies', ARRAY['digital_ads', 'general_consulting', 'communications'], 'democratic', FALSE),
+('Blue State', 'blue-state', ARRAY['digital_ads', 'fundraising', 'web_development', 'data_analytics'], 'democratic', FALSE),
+('Middle Seat', 'middle-seat', ARRAY['digital_ads', 'fundraising', 'creative'], 'democratic', FALSE),
+('Mothership Strategies', 'mothership-strategies', ARRAY['digital_ads', 'texting', 'fundraising'], 'democratic', FALSE),
+('Trilogy Interactive', 'trilogy-interactive', ARRAY['digital_ads', 'web_development', 'creative'], 'democratic', FALSE),
+('Mission Control', 'mission-control', ARRAY['digital_ads', 'data_analytics'], 'democratic', FALSE),
+('Deliver Strategies', 'deliver-strategies', ARRAY['texting', 'digital_ads'], 'democratic', FALSE),
+('Tatton Strategies', 'tatton-strategies', ARRAY['texting', 'digital_ads'], 'democratic', FALSE),
+('Lake Research Partners', 'lake-research-partners', ARRAY['polling'], 'democratic', FALSE),
+('Global Strategy Group', 'global-strategy-group', ARRAY['polling', 'general_consulting', 'communications'], 'democratic', FALSE),
+('Anzalone Liszt Grove Research', 'anzalone-liszt-grove-research', ARRAY['polling', 'data_analytics'], 'democratic', FALSE),
+('Change Research', 'change-research', ARRAY['polling', 'data_analytics'], 'democratic', FALSE),
+('AKPD Message and Media', 'akpd-message-and-media', ARRAY['media_buying', 'general_consulting', 'creative'], 'democratic', FALSE),
+('Putnam Partners', 'putnam-partners', ARRAY['media_buying', 'creative', 'video_production'], 'democratic', FALSE),
+('Dixon/Davis Media Group', 'dixon-davis-media-group', ARRAY['media_buying', 'creative', 'video_production'], 'democratic', FALSE),
+('Rally', 'rally', ARRAY['fundraising', 'digital_ads', 'web_development'], 'democratic', FALSE),
+('ActBlue', 'actblue', ARRAY['fundraising'], 'democratic', FALSE),
+('NGP VAN', 'ngp-van', ARRAY['data_analytics', 'web_development'], 'democratic', FALSE),
+('L2', 'l2', ARRAY['data_analytics'], 'nonpartisan', FALSE),
+('Civitech', 'civitech', ARRAY['data_analytics', 'web_development', 'digital_ads'], 'democratic', FALSE)
+ON CONFLICT (slug) DO NOTHING;

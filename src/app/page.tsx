@@ -1,65 +1,164 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import FirmCard from '@/components/FirmCard';
+import ReviewCard from '@/components/ReviewCard';
+import Button from '@/components/ui/Button';
+import { Review } from '@/types';
 
-export default function Home() {
+export default async function HomePage() {
+  const supabase = await createClient();
+
+  // Fetch top-rated firms (by average rating)
+  const { data: firms } = await supabase
+    .from('firms')
+    .select('*')
+    .limit(6);
+
+  // Fetch recent published reviews
+  const { data: reviews } = await supabase
+    .from('reviews')
+    .select('*, firms(name, slug), firm_responses(*)')
+    .eq('status', 'published')
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  // Get total stats
+  const { count: reviewCount } = await supabase
+    .from('reviews')
+    .select('id', { count: 'exact' })
+    .eq('status', 'published');
+
+  const { count: firmCount } = await supabase
+    .from('firms')
+    .select('id', { count: 'exact' });
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div>
+      {/* Hero */}
+      <section className="bg-navy text-white py-20 px-4">
+        <div className="max-w-5xl mx-auto text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+            The review platform political campaigns trust
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto mb-8">
+            Verified reviews of political consulting firms, written by the candidates, campaign
+            managers, and finance directors who hired them.
           </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/signup">
+              <Button variant="secondary" size="lg">Rate a Firm</Button>
+            </Link>
+            <Link href="/firms">
+              <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-navy">
+                Browse Firms
+              </Button>
+            </Link>
+          </div>
+
+          {/* Stats */}
+          <div className="flex gap-8 justify-center mt-12 text-center">
+            <div>
+              <p className="text-3xl font-bold text-amber-400">{reviewCount ?? 0}</p>
+              <p className="text-sm text-gray-300">Verified Reviews</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-amber-400">{firmCount ?? 0}</p>
+              <p className="text-sm text-gray-300">Firms Listed</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-amber-400">100%</p>
+              <p className="text-sm text-gray-300">Verified Reviewers</p>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* How it works */}
+      <section className="py-16 px-4 bg-gray-50">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl font-bold text-navy text-center mb-10">How CampaignGrade Works</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                step: '1',
+                title: 'Verify your role',
+                desc: 'Submit documentation proving you were a principal on a campaign committee. Our team verifies manually.',
+              },
+              {
+                step: '2',
+                title: 'Rate your vendors',
+                desc: 'Rate firms on communication, budget transparency, results, responsiveness, and strategic quality.',
+              },
+              {
+                step: '3',
+                title: 'Help the community',
+                desc: 'Your anonymous review helps other campaigns make better hiring decisions. Firms can respond.',
+              },
+            ].map((item) => (
+              <div key={item.step} className="text-center">
+                <div className="w-12 h-12 rounded-full bg-navy text-white text-lg font-bold flex items-center justify-center mx-auto mb-4">
+                  {item.step}
+                </div>
+                <h3 className="font-semibold text-navy mb-2">{item.title}</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </main>
+      </section>
+
+      {/* Featured firms */}
+      {firms && firms.length > 0 && (
+        <section className="py-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-navy">Firms on CampaignGrade</h2>
+              <Link href="/firms" className="text-navy text-sm font-medium hover:underline">
+                View all →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {firms.map((firm) => (
+                <FirmCard key={firm.id} firm={firm} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Recent reviews */}
+      {reviews && reviews.length > 0 && (
+        <section className="py-16 px-4 bg-gray-50">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl font-bold text-navy mb-8">Recent Reviews</h2>
+            {reviews.map((review) => (
+              <ReviewCard
+                key={review.id}
+                review={review as Review & { firm?: { name: string; slug: string } }}
+                showFirmName
+              />
+            ))}
+            <div className="text-center mt-6">
+              <Link href="/firms" className="text-navy font-medium hover:underline">
+                Browse all firms and reviews →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* CTA */}
+      <section className="py-16 px-4 bg-navy text-white text-center">
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-3xl font-bold mb-4">Have you hired a political consultant?</h2>
+          <p className="text-gray-300 mb-8">
+            Your verified review helps campaigns make smarter decisions. It takes less than 10 minutes.
+          </p>
+          <Link href="/signup">
+            <Button variant="secondary" size="lg">Rate a Firm You&apos;ve Worked With</Button>
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }
