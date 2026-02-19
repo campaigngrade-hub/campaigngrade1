@@ -19,7 +19,18 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single();
 
-  if (!profile) redirect('/login');
+  // If profile missing, create it on the fly then continue
+  if (!profile) {
+    const { createClient: createAdminClient } = await import('@/lib/supabase/admin');
+    const admin = createAdminClient();
+    await admin.from('profiles').upsert({
+      id: user.id,
+      email: user.email ?? '',
+      full_name: user.user_metadata?.full_name ?? '',
+      role: 'reviewer',
+    }, { onConflict: 'id' });
+    redirect('/dashboard');
+  }
 
   const { data: reviews } = await supabase
     .from('reviews')
