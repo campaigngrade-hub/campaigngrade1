@@ -9,7 +9,13 @@ import { StarRatingDisplay } from '@/components/StarRating';
 import { formatDate } from '@/lib/utils';
 import type { Profile } from '@/types';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ review?: string }>;
+}) {
+  const params = await searchParams;
+  const reviewSubmitted = params.review === 'submitted';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -59,6 +65,16 @@ export default async function DashboardPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
+      {reviewSubmitted && (
+        <div className="mb-6 bg-green-50 border border-green-200 text-green-800 rounded-md px-4 py-3 text-sm flex items-start gap-2">
+          <span className="text-lg leading-none">✓</span>
+          <div>
+            <strong>Review submitted successfully!</strong> Your review is now in our moderation queue
+            and will be published within 24–48 hours if it meets our content guidelines.
+            The firm has been notified and can claim their profile.
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-navy">Dashboard</h1>

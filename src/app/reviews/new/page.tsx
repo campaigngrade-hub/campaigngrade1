@@ -57,23 +57,24 @@ export default function NewReviewPage() {
   const { profile, loading } = useProfile();
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [firmSearch, setFirmSearch] = useState('');
   const [firmResults, setFirmResults] = useState<Firm[]>([]);
   const [selectedFirm, setSelectedFirm] = useState<Firm | null>(null);
-  const [committees, setCommittees] = useState<(CommitteeMember & { committee?: { name: string; cycle_year: number } })[]>([]);
+  const [committees, setCommittees] = useState<(CommitteeMember & { committees?: { name: string; cycle_year: number } })[]>([]);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [showAddCommittee, setShowAddCommittee] = useState(false);
   const [newCommitteeName, setNewCommitteeName] = useState('');
   const [newCommitteeYear, setNewCommitteeYear] = useState('2024');
   const [addingCommittee, setAddingCommittee] = useState(false);
+  const [hireAgain, setHireAgain] = useState<boolean>(true);
 
   const {
     register,
-    handleSubmit,
     control,
     setValue,
-    watch,
-    formState: { errors, isSubmitting },
+    getValues,
+    formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -157,16 +158,16 @@ export default function NewReviewPage() {
     );
   }
 
-  const ratingField = (key: string, label: string, required = false) => (
+  const ratingField = (key: keyof FormData, label: string, required = false) => (
     <Controller
       key={key}
-      name={key as keyof FormData}
+      name={key}
       control={control}
       render={({ field, fieldState }) => (
         <StarRatingInput
           label={label}
           value={(field.value as number) || 0}
-          onChange={field.onChange}
+          onChange={(val) => field.onChange(val)}
           required={required}
           error={fieldState.error?.message}
         />
@@ -174,120 +175,171 @@ export default function NewReviewPage() {
     />
   );
 
-  async function onSubmit(data: FormData) {
+  async function goToStep2() {
+    setError(null);
+    const firmId = getValues('firm_id');
+    const contactEmail = getValues('firm_contact_email');
+    const committeeId = getValues('committee_id');
+
+    if (!firmId) { setError('Please select a firm.'); return; }
+    if (!contactEmail) { setError("Please enter the firm's contact email."); return; }
+    // Validate email format
+    const emailValid = z.string().email().safeParse(contactEmail);
+    if (!emailValid.success) { setError('Please enter a valid email address for the firm.'); return; }
+    if (!committeeId) { setError('Please select or add a committee.'); return; }
+    setStep(2);
+  }
+
+  async function goToStep3() {
+    setError(null);
+    const rating = getValues('rating_overall');
+    if (!rating || rating < 1) { setError('Please provide an overall rating.'); return; }
+    setStep(3);
+  }
+
+  async function goToStep4() {
+    setError(null);
+    const reviewText = getValues('review_text');
+    const raceType = getValues('race_type');
+    if (!reviewText || reviewText.length < 50) {
+      setError('Your review must be at least 50 characters.');
+      return;
+    }
+    if (!raceType) { setError('Please select a race type.'); return; }
+    setStep(4);
+  }
+
+  async function submitReview() {
     setError(null);
 
     if (!invoiceFile) {
       setError('Please upload an invoice or contract to verify your engagement.');
-      setStep(4);
       return;
     }
 
-    const supabase = createClient();
+    const data = getValues();
 
-    // Check duplicate
-    const { data: existing } = await supabase
-      .from('reviews')
-      .select('id')
-      .eq('reviewer_id', profile!.id)
-      .eq('firm_id', data.firm_id)
-      .eq('cycle_year', data.cycle_year)
-      .single();
-
-    if (existing) {
-      setError(`You've already reviewed this firm for the ${data.cycle_year} cycle.`);
-      return;
+    // Validate all required fields manually before submitting
+    if (!data.firm_id) { setError('Please select a firm.'); return; }
+    if (!data.firm_contact_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.firm_contact_email)) {
+      setError("Please enter a valid email for the firm."); return;
     }
+    if (!data.committee_id) { setError('Please select a committee.'); return; }
+    if (!data.rating_overall || data.rating_overall < 1) { setError('Please provide an overall rating.'); return; }
+    if (!data.review_text || data.review_text.length < 50) { setError('Review must be at least 50 characters.'); return; }
+    if (!data.race_type) { setError('Please select a race type.'); return; }
+    setSubmitting(true);
 
-    // Check committee cap
-    const { count } = await supabase
-      .from('reviews')
-      .select('id', { count: 'exact' })
-      .eq('committee_id', data.committee_id)
-      .eq('firm_id', data.firm_id)
-      .eq('cycle_year', data.cycle_year);
+    try {
+      const supabase = createClient();
 
-    if ((count ?? 0) >= 3) {
-      setError('Multiple members of your committee have already reviewed this firm for this cycle.');
-      return;
+      // Check duplicate
+      const { data: existing } = await supabase
+        .from('reviews')
+        .select('id')
+        .eq('reviewer_id', profile!.id)
+        .eq('firm_id', data.firm_id)
+        .eq('cycle_year', data.cycle_year)
+        .maybeSingle();
+
+      if (existing) {
+        setError(`You've already reviewed this firm for the ${data.cycle_year} cycle.`);
+        setSubmitting(false);
+        return;
+      }
+
+      // Check committee cap (max 3 reviews per committee/firm/cycle)
+      const { count } = await supabase
+        .from('reviews')
+        .select('id', { count: 'exact' })
+        .eq('committee_id', data.committee_id)
+        .eq('firm_id', data.firm_id)
+        .eq('cycle_year', data.cycle_year);
+
+      if ((count ?? 0) >= 3) {
+        setError('Multiple members of your committee have already reviewed this firm for this cycle.');
+        setSubmitting(false);
+        return;
+      }
+
+      // Rate limiting: max 10 reviews in 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { count: recentCount } = await supabase
+        .from('reviews')
+        .select('id', { count: 'exact' })
+        .eq('reviewer_id', profile!.id)
+        .gte('created_at', thirtyDaysAgo.toISOString());
+
+      if ((recentCount ?? 0) >= 10) {
+        setError('You have reached the maximum of 10 reviews in a 30-day period.');
+        setSubmitting(false);
+        return;
+      }
+
+      // Upload invoice (required)
+      const ext = invoiceFile.name.split('.').pop();
+      const path = `${profile!.id}/review-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('verification-evidence')
+        .upload(path, invoiceFile);
+
+      if (uploadError) {
+        setError('Failed to upload invoice: ' + uploadError.message);
+        setSubmitting(false);
+        return;
+      }
+
+      // Insert review
+      const { error: insertError } = await supabase.from('reviews').insert({
+        reviewer_id: profile!.id,
+        firm_id: data.firm_id,
+        committee_id: data.committee_id,
+        rating_overall: data.rating_overall,
+        rating_communication: data.rating_communication ?? null,
+        rating_budget_transparency: data.rating_budget_transparency ?? null,
+        rating_results_vs_projections: data.rating_results_vs_projections ?? null,
+        rating_responsiveness: data.rating_responsiveness ?? null,
+        rating_strategic_quality: data.rating_strategic_quality ?? null,
+        review_text: data.review_text,
+        pros: data.pros ?? null,
+        cons: data.cons ?? null,
+        cycle_year: data.cycle_year,
+        race_type: data.race_type,
+        region: data.region ?? null,
+        budget_tier: data.budget_tier ?? null,
+        service_used: data.service_used ?? null,
+        would_hire_again: data.would_hire_again,
+        race_outcome: data.race_outcome ?? null,
+        anonymization_level: data.anonymization_level,
+        has_invoice_evidence: true,
+        status: 'pending',
+      });
+
+      if (insertError) {
+        setError('Failed to submit review: ' + insertError.message);
+        setSubmitting(false);
+        return;
+      }
+
+      // Save firm contact email via API (uses admin client, bypasses RLS)
+      await fetch('/api/notify-firm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firmName: selectedFirm?.name,
+          firmSlug: selectedFirm?.slug,
+          firmEmail: data.firm_contact_email,
+          firmId: data.firm_id,
+        }),
+      });
+
+      router.push('/dashboard?review=submitted');
+    } catch (err) {
+      console.error('Submit error:', err);
+      setError('An unexpected error occurred. Please try again.');
+      setSubmitting(false);
     }
-
-    // Rate limiting
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const { count: recentCount } = await supabase
-      .from('reviews')
-      .select('id', { count: 'exact' })
-      .eq('reviewer_id', profile!.id)
-      .gte('created_at', thirtyDaysAgo.toISOString());
-
-    if ((recentCount ?? 0) >= 10) {
-      setError('You have reached the maximum of 10 reviews in a 30-day period.');
-      return;
-    }
-
-    // Upload invoice (required)
-    const ext = invoiceFile.name.split('.').pop();
-    const path = `${profile!.id}/review-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from('verification-evidence')
-      .upload(path, invoiceFile);
-
-    if (uploadError) {
-      setError('Failed to upload invoice: ' + uploadError.message);
-      return;
-    }
-
-    // Save firm contact email (only if not already set)
-    await supabase
-      .from('firms')
-      .update({ contact_email: data.firm_contact_email })
-      .eq('id', data.firm_id)
-      .is('contact_email', null);
-
-    // Insert review
-    const { error: insertError } = await supabase.from('reviews').insert({
-      reviewer_id: profile!.id,
-      firm_id: data.firm_id,
-      committee_id: data.committee_id,
-      rating_overall: data.rating_overall,
-      rating_communication: data.rating_communication ?? null,
-      rating_budget_transparency: data.rating_budget_transparency ?? null,
-      rating_results_vs_projections: data.rating_results_vs_projections ?? null,
-      rating_responsiveness: data.rating_responsiveness ?? null,
-      rating_strategic_quality: data.rating_strategic_quality ?? null,
-      review_text: data.review_text,
-      pros: data.pros ?? null,
-      cons: data.cons ?? null,
-      cycle_year: data.cycle_year,
-      race_type: data.race_type,
-      region: data.region ?? null,
-      budget_tier: data.budget_tier ?? null,
-      service_used: data.service_used ?? null,
-      would_hire_again: data.would_hire_again,
-      race_outcome: data.race_outcome ?? null,
-      anonymization_level: data.anonymization_level,
-      has_invoice_evidence: true,
-      status: 'pending',
-    });
-
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-
-    // Notify firm via API route
-    await fetch('/api/notify-firm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        firmName: selectedFirm?.name,
-        firmSlug: selectedFirm?.slug,
-        firmEmail: data.firm_contact_email,
-      }),
-    });
-
-    router.push('/dashboard?review=submitted');
   }
 
   return (
@@ -322,349 +374,343 @@ export default function NewReviewPage() {
         ))}
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        {/* Step 1: Firm + committee */}
-        {step === 1 && (
-          <Card className="space-y-4">
-            <h2 className="font-semibold text-navy text-lg">Which firm are you reviewing?</h2>
+      {/* Step 1: Firm + committee */}
+      {step === 1 && (
+        <Card className="space-y-4">
+          <h2 className="font-semibold text-navy text-lg">Which firm are you reviewing?</h2>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search for a firm</label>
-              <Input
-                placeholder="Type firm name..."
-                value={firmSearch}
-                onChange={(e) => setFirmSearch(e.target.value)}
-                error={errors.firm_id?.message}
-              />
-              {firmResults.length > 0 && (
-                <div className="border border-gray-200 rounded-md mt-1 max-h-48 overflow-y-auto">
-                  {firmResults.map((firm) => (
-                    <button
-                      key={firm.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedFirm(firm);
-                        setValue('firm_id', firm.id);
-                        const contactEmail = (firm as Firm & { contact_email?: string }).contact_email;
-                        if (contactEmail) setValue('firm_contact_email', contactEmail);
-                        setFirmSearch(firm.name);
-                        setFirmResults([]);
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                    >
-                      {firm.name}
-                      {firm.services?.length && (
-                        <span className="text-gray-400 ml-2">· {firm.services[0]}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {firmSearch && !firmResults.length && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Firm not found?{' '}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search for a firm</label>
+            <Input
+              placeholder="Type firm name..."
+              value={firmSearch}
+              onChange={(e) => setFirmSearch(e.target.value)}
+              error={errors.firm_id?.message}
+            />
+            {firmResults.length > 0 && (
+              <div className="border border-gray-200 rounded-md mt-1 max-h-48 overflow-y-auto">
+                {firmResults.map((firm) => (
                   <button
+                    key={firm.id}
                     type="button"
-                    className="text-navy underline"
-                    onClick={async () => {
-                      const supabase = createClient();
-                      const slug = firmSearch.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-                      const { data: newFirm } = await supabase
-                        .from('firms')
-                        .insert({ name: firmSearch, slug: `${slug}-${Date.now()}` })
-                        .select()
-                        .single();
-                      if (newFirm) {
-                        setSelectedFirm(newFirm);
-                        setValue('firm_id', newFirm.id);
-                        setFirmResults([]);
-                      }
+                    onClick={() => {
+                      setSelectedFirm(firm);
+                      setValue('firm_id', firm.id);
+                      const contactEmail = (firm as Firm & { contact_email?: string }).contact_email;
+                      if (contactEmail) setValue('firm_contact_email', contactEmail);
+                      setFirmSearch(firm.name);
+                      setFirmResults([]);
+                      setError(null);
                     }}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                   >
-                    Add it
+                    {firm.name}
+                    {firm.services?.length && (
+                      <span className="text-gray-400 ml-2">· {firm.services[0]}</span>
+                    )}
                   </button>
-                </p>
-              )}
-            </div>
-
-            {selectedFirm && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
-                Reviewing: <strong>{selectedFirm.name}</strong>
+                ))}
               </div>
             )}
+            {firmSearch && !firmResults.length && (
+              <p className="text-xs text-gray-400 mt-1">
+                Firm not found?{' '}
+                <button
+                  type="button"
+                  className="text-navy underline"
+                  onClick={async () => {
+                    const supabase = createClient();
+                    const slug = firmSearch.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                    const { data: newFirm } = await supabase
+                      .from('firms')
+                      .insert({ name: firmSearch, slug: `${slug}-${Date.now()}` })
+                      .select()
+                      .single();
+                    if (newFirm) {
+                      setSelectedFirm(newFirm);
+                      setValue('firm_id', newFirm.id);
+                      setFirmResults([]);
+                    }
+                  }}
+                >
+                  Add it
+                </button>
+              </p>
+            )}
+          </div>
 
-            <Input
-              id="firm_contact_email"
-              label="Firm's contact email"
-              type="email"
-              placeholder="contact@firmname.com"
-              helpText="We'll notify the firm that a review was posted so they can claim their profile."
-              error={errors.firm_contact_email?.message}
-              {...register('firm_contact_email')}
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Which committee was this for?
-              </label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-navy"
-                {...register('committee_id')}
-              >
-                <option value="">Select committee...</option>
-                {committees.map((cm) => (
-                  <option key={cm.committee_id} value={cm.committee_id}>
-                    {(cm as { committees?: { name: string; cycle_year: number } }).committees?.name ?? cm.committee_id}
-                    {' '}({(cm as { committees?: { name: string; cycle_year: number } }).committees?.cycle_year})
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setShowAddCommittee(!showAddCommittee)}
-                className="text-xs text-navy underline mt-1 block"
-              >
-                + Add a committee
-              </button>
-              {showAddCommittee && (
-                <div className="mt-2 p-3 border border-gray-200 rounded-md bg-gray-50 space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Committee name (e.g. Friends of Jane Smith)"
-                    value={newCommitteeName}
-                    onChange={(e) => setNewCommitteeName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  />
-                  <select
-                    value={newCommitteeYear}
-                    onChange={(e) => setNewCommitteeYear(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  >
-                    {Array.from({ length: 29 }, (_, i) => 2040 - i).map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <Button type="button" size="sm" onClick={handleAddCommittee} disabled={addingCommittee}>
-                    {addingCommittee ? 'Adding...' : 'Add Committee'}
-                  </Button>
-                </div>
-              )}
-              {errors.committee_id && (
-                <p className="text-xs text-red-600 mt-1">{errors.committee_id.message}</p>
-              )}
+          {selectedFirm && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+              Reviewing: <strong>{selectedFirm.name}</strong>
             </div>
+          )}
 
-            <Button
-              type="button"
-              size="lg"
-              className="w-full"
-              onClick={() => {
-                if (!watch('firm_id')) { setError('Please select a firm.'); return; }
-                if (!watch('firm_contact_email')) { setError("Please enter the firm's contact email."); return; }
-                if (!watch('committee_id')) { setError('Please select a committee.'); return; }
-                setError(null);
-                setStep(2);
-              }}
+          <Input
+            id="firm_contact_email"
+            label="Firm's contact email"
+            type="email"
+            placeholder="contact@firmname.com"
+            helpText="We'll notify the firm that a review was posted so they can claim their profile."
+            error={errors.firm_contact_email?.message}
+            {...register('firm_contact_email')}
+          />
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Which committee was this for?
+            </label>
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-navy"
+              {...register('committee_id')}
             >
-              Continue
-            </Button>
-          </Card>
-        )}
-
-        {/* Step 2: Ratings */}
-        {step === 2 && (
-          <Card className="space-y-6">
-            <h2 className="font-semibold text-navy text-lg">Rate this firm</h2>
-            {ratingField('rating_overall', 'Overall Rating', true)}
-            {ratingField('rating_communication', 'Communication')}
-            {ratingField('rating_budget_transparency', 'Budget Transparency')}
-            {ratingField('rating_results_vs_projections', 'Results vs. Projections')}
-            {ratingField('rating_responsiveness', 'Responsiveness')}
-            {ratingField('rating_strategic_quality', 'Strategic Quality')}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Would you hire this firm again?</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" value="true" {...register('would_hire_again', { setValueAs: (v) => v === 'true' })} />
-                  <span className="text-sm text-green-700 font-medium">Yes</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" value="false" {...register('would_hire_again', { setValueAs: (v) => v === 'true' })} />
-                  <span className="text-sm text-red-700 font-medium">No</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button type="button" size="lg" className="flex-1" onClick={() => {
-                if (!watch('rating_overall')) { setError('Please provide an overall rating.'); return; }
-                setError(null);
-                setStep(3);
-              }}>
-                Continue
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Step 3: Context & text */}
-        {step === 3 && (
-          <Card className="space-y-4">
-            <h2 className="font-semibold text-navy text-lg">Review Details</h2>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Controller
-                name="cycle_year"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    id="cycle_year"
-                    label="Election cycle"
-                    options={CYCLE_YEARS}
-                    value={String(field.value)}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
-                  />
-                )}
-              />
-              <Select
-                id="race_type"
-                label="Race type"
-                options={RACE_TYPES as unknown as { value: string; label: string }[]}
-                placeholder="Select..."
-                error={errors.race_type?.message}
-                {...register('race_type')}
-              />
-              <Select
-                id="region"
-                label="Region"
-                options={REGIONS as unknown as { value: string; label: string }[]}
-                placeholder="Select..."
-                {...register('region')}
-              />
-              <Select
-                id="budget_tier"
-                label="Budget range"
-                options={BUDGET_TIERS as unknown as { value: string; label: string }[]}
-                placeholder="Select..."
-                {...register('budget_tier')}
-              />
-              <Select
-                id="service_used"
-                label="Service used"
-                options={SERVICE_CATEGORIES as unknown as { value: string; label: string }[]}
-                placeholder="Select..."
-                {...register('service_used')}
-              />
-              <Select
-                id="race_outcome"
-                label="Race outcome"
-                options={RACE_OUTCOMES as unknown as { value: string; label: string }[]}
-                placeholder="Select..."
-                {...register('race_outcome')}
-              />
-            </div>
-
-            <Select
-              id="anonymization_level"
-              label="Anonymization level"
-              options={[
-                { value: 'standard', label: 'Standard — Show race type, region, cycle, budget' },
-                { value: 'minimal', label: 'Minimal — Show race type and cycle only (for small races)' },
-              ]}
-              {...register('anonymization_level')}
-            />
-
-            <Textarea
-              id="review_text"
-              label="Your review"
-              rows={6}
-              placeholder="Describe your experience working with this firm. What did they do well? What fell short? What should other campaign principals know?"
-              error={errors.review_text?.message}
-              helpText="Minimum 50 characters. Focus on the professional relationship, not individuals."
-              {...register('review_text')}
-            />
-
-            <Textarea
-              id="pros"
-              label="Pros (optional)"
-              rows={2}
-              placeholder="What did they do well?"
-              {...register('pros')}
-            />
-
-            <Textarea
-              id="cons"
-              label="Cons (optional)"
-              rows={2}
-              placeholder="Where did they fall short?"
-              {...register('cons')}
-            />
-
-            <div className="flex gap-3">
-              <Button type="button" variant="outline" onClick={() => setStep(2)}>Back</Button>
-              <Button type="button" size="lg" className="flex-1" onClick={() => {
-                if (!watch('review_text') || (watch('review_text') ?? '').length < 50) {
-                  setError('Review must be at least 50 characters.');
-                  return;
-                }
-                if (!watch('race_type')) { setError('Please select a race type.'); return; }
-                setError(null);
-                setStep(4);
-              }}>
-                Continue
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Step 4: Invoice + submit */}
-        {step === 4 && (
-          <Card className="space-y-4">
-            <h2 className="font-semibold text-navy text-lg">Verify Your Engagement & Submit</h2>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm">
-              <h3 className="font-semibold text-amber-900 mb-2">Content Guidelines Reminder</h3>
-              <ul className="space-y-1 text-amber-800 list-disc list-inside">
-                <li>Do not accuse anyone of criminal conduct</li>
-                <li>Do not name individual employees — focus on the firm</li>
-                <li>Do not disclose exact contract amounts or donor info</li>
-                <li>Keep it factual and honest — this is your professional opinion</li>
-              </ul>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Upload invoice or contract <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-navy file:text-white hover:file:bg-navy-dark"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Required. Verifies your paid engagement with this firm and earns the{' '}
-                <strong>Verified Engagement</strong> badge. Accepted: PDF, JPG, PNG.
-              </p>
-            </div>
-
-            <div className="border-t pt-4">
-              <p className="text-sm text-gray-600 mb-4">
-                Your review will be submitted for moderation and published within 24–48 hours
-                if it meets our content guidelines.
-              </p>
-              <div className="flex gap-3">
-                <Button type="button" variant="outline" onClick={() => setStep(3)}>Back</Button>
-                <Button type="submit" size="lg" className="flex-1" disabled={isSubmitting}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Review'}
+              <option value="">Select committee...</option>
+              {committees.map((cm) => (
+                <option key={cm.committee_id} value={cm.committee_id}>
+                  {cm.committees?.name ?? cm.committee_id}
+                  {' '}({cm.committees?.cycle_year})
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowAddCommittee(!showAddCommittee)}
+              className="text-xs text-navy underline mt-1 block"
+            >
+              + Add a committee
+            </button>
+            {showAddCommittee && (
+              <div className="mt-2 p-3 border border-gray-200 rounded-md bg-gray-50 space-y-2">
+                <input
+                  type="text"
+                  placeholder="Committee name (e.g. Friends of Jane Smith)"
+                  value={newCommitteeName}
+                  onChange={(e) => setNewCommitteeName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+                <select
+                  value={newCommitteeYear}
+                  onChange={(e) => setNewCommitteeYear(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  {Array.from({ length: 29 }, (_, i) => 2040 - i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <Button type="button" size="sm" onClick={handleAddCommittee} disabled={addingCommittee}>
+                  {addingCommittee ? 'Adding...' : 'Add Committee'}
                 </Button>
               </div>
+            )}
+            {errors.committee_id && (
+              <p className="text-xs text-red-600 mt-1">{errors.committee_id.message}</p>
+            )}
+          </div>
+
+          <Button type="button" size="lg" className="w-full" onClick={goToStep2}>
+            Continue
+          </Button>
+        </Card>
+      )}
+
+      {/* Step 2: Ratings */}
+      {step === 2 && (
+        <Card className="space-y-6">
+          <h2 className="font-semibold text-navy text-lg">Rate this firm</h2>
+          {ratingField('rating_overall', 'Overall Rating', true)}
+          {ratingField('rating_communication', 'Communication')}
+          {ratingField('rating_budget_transparency', 'Budget Transparency')}
+          {ratingField('rating_results_vs_projections', 'Results vs. Projections')}
+          {ratingField('rating_responsiveness', 'Responsiveness')}
+          {ratingField('rating_strategic_quality', 'Strategic Quality')}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Would you hire this firm again?</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="would_hire_again_radio"
+                  checked={hireAgain === true}
+                  onChange={() => { setHireAgain(true); setValue('would_hire_again', true); }}
+                />
+                <span className="text-sm text-green-700 font-medium">Yes</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="would_hire_again_radio"
+                  checked={hireAgain === false}
+                  onChange={() => { setHireAgain(false); setValue('would_hire_again', false); }}
+                />
+                <span className="text-sm text-red-700 font-medium">No</span>
+              </label>
             </div>
-          </Card>
-        )}
-      </form>
+          </div>
+
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>
+            <Button type="button" size="lg" className="flex-1" onClick={goToStep3}>
+              Continue
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Step 3: Context & text */}
+      {step === 3 && (
+        <Card className="space-y-4">
+          <h2 className="font-semibold text-navy text-lg">Review Details</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Controller
+              name="cycle_year"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  id="cycle_year"
+                  label="Election cycle"
+                  options={CYCLE_YEARS}
+                  value={String(field.value)}
+                  onChange={(e) => field.onChange(parseInt(e.target.value))}
+                />
+              )}
+            />
+            <Select
+              id="race_type"
+              label="Race type"
+              options={RACE_TYPES as unknown as { value: string; label: string }[]}
+              placeholder="Select..."
+              error={errors.race_type?.message}
+              {...register('race_type')}
+            />
+            <Select
+              id="region"
+              label="Region"
+              options={REGIONS as unknown as { value: string; label: string }[]}
+              placeholder="Select..."
+              {...register('region')}
+            />
+            <Select
+              id="budget_tier"
+              label="Budget range"
+              options={BUDGET_TIERS as unknown as { value: string; label: string }[]}
+              placeholder="Select..."
+              {...register('budget_tier')}
+            />
+            <Select
+              id="service_used"
+              label="Service used"
+              options={SERVICE_CATEGORIES as unknown as { value: string; label: string }[]}
+              placeholder="Select..."
+              {...register('service_used')}
+            />
+            <Select
+              id="race_outcome"
+              label="Race outcome"
+              options={RACE_OUTCOMES as unknown as { value: string; label: string }[]}
+              placeholder="Select..."
+              {...register('race_outcome')}
+            />
+          </div>
+
+          <Select
+            id="anonymization_level"
+            label="Anonymization level"
+            options={[
+              { value: 'standard', label: 'Standard — Show race type, region, cycle, budget' },
+              { value: 'minimal', label: 'Minimal — Show race type and cycle only (for small races)' },
+            ]}
+            {...register('anonymization_level')}
+          />
+
+          <Textarea
+            id="review_text"
+            label="Your review"
+            rows={6}
+            placeholder="Describe your experience working with this firm. What did they do well? What fell short? What should other campaign principals know?"
+            error={errors.review_text?.message}
+            helpText="Minimum 50 characters. Focus on the professional relationship, not individuals."
+            {...register('review_text')}
+          />
+
+          <Textarea
+            id="pros"
+            label="Pros (optional)"
+            rows={2}
+            placeholder="What did they do well?"
+            {...register('pros')}
+          />
+
+          <Textarea
+            id="cons"
+            label="Cons (optional)"
+            rows={2}
+            placeholder="Where did they fall short?"
+            {...register('cons')}
+          />
+
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" onClick={() => setStep(2)}>Back</Button>
+            <Button type="button" size="lg" className="flex-1" onClick={goToStep4}>
+              Continue
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Step 4: Invoice + submit */}
+      {step === 4 && (
+        <Card className="space-y-4">
+          <h2 className="font-semibold text-navy text-lg">Verify Your Engagement & Submit</h2>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm">
+            <h3 className="font-semibold text-amber-900 mb-2">Content Guidelines Reminder</h3>
+            <ul className="space-y-1 text-amber-800 list-disc list-inside">
+              <li>Do not accuse anyone of criminal conduct</li>
+              <li>Do not name individual employees — focus on the firm</li>
+              <li>Do not disclose exact contract amounts or donor info</li>
+              <li>Keep it factual and honest — this is your professional opinion</li>
+            </ul>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Upload invoice or contract <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-navy file:text-white hover:file:bg-navy-dark"
+            />
+            {invoiceFile && (
+              <p className="text-xs text-green-600 mt-1">✓ {invoiceFile.name} ready to upload</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Required. Verifies your paid engagement with this firm. Accepted: PDF, JPG, PNG.
+            </p>
+          </div>
+
+          <div className="border-t pt-4">
+            <p className="text-sm text-gray-600 mb-4">
+              Your review will be submitted for moderation and published within 24–48 hours
+              if it meets our content guidelines.
+            </p>
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={() => setStep(3)}>Back</Button>
+              <Button
+                type="button"
+                size="lg"
+                className="flex-1"
+                disabled={submitting}
+                onClick={submitReview}
+              >
+                {submitting ? 'Submitting...' : 'Submit Review'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
