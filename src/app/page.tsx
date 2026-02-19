@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import FirmCard from '@/components/FirmCard';
 import ReviewCard from '@/components/ReviewCard';
 import Button from '@/components/ui/Button';
+import { HeroCTA, BottomCTA } from '@/components/HeroCTA';
 import { Review } from '@/types';
 
 export default async function HomePage() {
@@ -44,16 +45,7 @@ export default async function HomePage() {
             Verified reviews of political consulting firms, written by the candidates, campaign
             managers, and finance directors who hired them.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
-              <Button variant="secondary" size="lg">Rate a Firm</Button>
-            </Link>
-            <Link href="/firms">
-              <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-navy">
-                Browse Firms
-              </Button>
-            </Link>
-          </div>
+          <HeroCTA />
 
           {/* Stats */}
           <div className="flex gap-8 justify-center mt-12 text-center">
@@ -154,9 +146,7 @@ export default async function HomePage() {
           <p className="text-gray-300 mb-8">
             Your verified review helps campaigns make smarter decisions. It takes less than 10 minutes.
           </p>
-          <Link href="/signup">
-            <Button variant="secondary" size="lg">Rate a Firm You&apos;ve Worked With</Button>
-          </Link>
+          <BottomCTA />
         </div>
       </section>
     </div>

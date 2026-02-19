@@ -24,7 +24,7 @@ import { Firm, CommitteeMember } from '@/types';
 
 const schema = z.object({
   firm_id: z.string().uuid('Please select a firm'),
-  committee_id: z.string().uuid('Please select a committee'),
+  committee_id: z.string().optional(),
   rating_overall: z.number().int().min(1, 'Overall rating is required').max(5),
   rating_communication: z.number().int().min(1).max(5).optional(),
   rating_budget_transparency: z.number().int().min(1).max(5).optional(),
@@ -153,16 +153,18 @@ export default function NewReviewPage() {
     }
 
     // Check committee cap (max 3 reviews from same committee for same firm+cycle)
-    const { count } = await supabase
-      .from('reviews')
-      .select('id', { count: 'exact' })
-      .eq('committee_id', data.committee_id)
-      .eq('firm_id', data.firm_id)
-      .eq('cycle_year', data.cycle_year);
+    if (data.committee_id) {
+      const { count } = await supabase
+        .from('reviews')
+        .select('id', { count: 'exact' })
+        .eq('committee_id', data.committee_id)
+        .eq('firm_id', data.firm_id)
+        .eq('cycle_year', data.cycle_year);
 
-    if ((count ?? 0) >= 3) {
-      setError('Multiple members of your committee have already reviewed this firm for this cycle.');
-      return;
+      if ((count ?? 0) >= 3) {
+        setError('Multiple members of your committee have already reviewed this firm for this cycle.');
+        return;
+      }
     }
 
     // Rate limiting: max 10 reviews in 30 days
@@ -193,7 +195,7 @@ export default function NewReviewPage() {
     const { error: insertError } = await supabase.from('reviews').insert({
       reviewer_id: profile!.id,
       firm_id: data.firm_id,
-      committee_id: data.committee_id,
+      committee_id: data.committee_id ?? null,
       rating_overall: data.rating_overall,
       rating_communication: data.rating_communication ?? null,
       rating_budget_transparency: data.rating_budget_transparency ?? null,
@@ -361,8 +363,8 @@ export default function NewReviewPage() {
               size="lg"
               className="w-full"
               onClick={() => {
-                if (!watch('firm_id') || !watch('committee_id')) {
-                  setError('Please select a firm and committee before continuing.');
+                if (!watch('firm_id')) {
+                  setError('Please select a firm before continuing.');
                   return;
                 }
                 setError(null);
