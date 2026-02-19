@@ -24,7 +24,7 @@ import { Firm, CommitteeMember } from '@/types';
 
 const schema = z.object({
   firm_id: z.string().uuid('Please select a firm'),
-  committee_id: z.string().optional(),
+  committee_id: z.string().uuid('Please select a committee'),
   rating_overall: z.number().int().min(1, 'Overall rating is required').max(5),
   rating_communication: z.number().int().min(1).max(5).optional(),
   rating_budget_transparency: z.number().int().min(1).max(5).optional(),
@@ -56,6 +56,10 @@ export default function NewReviewPage() {
   const [selectedFirm, setSelectedFirm] = useState<Firm | null>(null);
   const [committees, setCommittees] = useState<(CommitteeMember & { committee?: { name: string; cycle_year: number } })[]>([]);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [showAddCommittee, setShowAddCommittee] = useState(false);
+  const [newCommitteeName, setNewCommitteeName] = useState('');
+  const [newCommitteeYear, setNewCommitteeYear] = useState('2024');
+  const [addingCommittee, setAddingCommittee] = useState(false);
 
   const {
     register,
@@ -99,6 +103,24 @@ export default function NewReviewPage() {
       .eq('profile_id', profile.id)
       .then(({ data }) => setCommittees(data as typeof committees ?? []));
   }, [profile]);
+
+  async function handleAddCommittee() {
+    if (!newCommitteeName.trim() || !profile) return;
+    setAddingCommittee(true);
+    const supabase = createClient();
+    const { data: committee, error: cErr } = await supabase
+      .from('committees')
+      .insert({ name: newCommitteeName.trim(), cycle_year: parseInt(newCommitteeYear) })
+      .select().single();
+    if (cErr || !committee) { setAddingCommittee(false); return; }
+    await supabase.from('committee_members').insert({ profile_id: profile.id, committee_id: committee.id, role_on_committee: 'other_senior_staff' });
+    const { data: refreshed } = await supabase.from('committee_members').select('*, committees(name, cycle_year)').eq('profile_id', profile.id);
+    setCommittees(refreshed as typeof committees ?? []);
+    setValue('committee_id', committee.id);
+    setShowAddCommittee(false);
+    setNewCommitteeName('');
+    setAddingCommittee(false);
+  }
 
   if (loading) return <div className="flex items-center justify-center min-h-64"><div className="text-gray-500">Loading...</div></div>;
 
@@ -153,18 +175,16 @@ export default function NewReviewPage() {
     }
 
     // Check committee cap (max 3 reviews from same committee for same firm+cycle)
-    if (data.committee_id) {
-      const { count } = await supabase
-        .from('reviews')
-        .select('id', { count: 'exact' })
-        .eq('committee_id', data.committee_id)
-        .eq('firm_id', data.firm_id)
-        .eq('cycle_year', data.cycle_year);
+    const { count } = await supabase
+      .from('reviews')
+      .select('id', { count: 'exact' })
+      .eq('committee_id', data.committee_id)
+      .eq('firm_id', data.firm_id)
+      .eq('cycle_year', data.cycle_year);
 
-      if ((count ?? 0) >= 3) {
-        setError('Multiple members of your committee have already reviewed this firm for this cycle.');
-        return;
-      }
+    if ((count ?? 0) >= 3) {
+      setError('Multiple members of your committee have already reviewed this firm for this cycle.');
+      return;
     }
 
     // Rate limiting: max 10 reviews in 30 days
@@ -195,7 +215,7 @@ export default function NewReviewPage() {
     const { error: insertError } = await supabase.from('reviews').insert({
       reviewer_id: profile!.id,
       firm_id: data.firm_id,
-      committee_id: data.committee_id ?? null,
+      committee_id: data.committee_id,
       rating_overall: data.rating_overall,
       rating_communication: data.rating_communication ?? null,
       rating_budget_transparency: data.rating_budget_transparency ?? null,
@@ -335,23 +355,47 @@ export default function NewReviewPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Which committee was this for?
               </label>
-              {committees.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  No verified committees on file.{' '}
-                  <a href="/verify" className="text-navy underline">Add a committee</a>
-                </p>
-              ) : (
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-navy"
-                  {...register('committee_id')}
-                >
-                  <option value="">Select committee...</option>
-                  {committees.map((cm) => (
-                    <option key={cm.committee_id} value={cm.committee_id}>
-                      {(cm as { committees?: { name: string; cycle_year: number } }).committees?.name ?? cm.committee_id}
-                    </option>
-                  ))}
-                </select>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-navy"
+                {...register('committee_id')}
+              >
+                <option value="">Select committee...</option>
+                {committees.map((cm) => (
+                  <option key={cm.committee_id} value={cm.committee_id}>
+                    {(cm as { committees?: { name: string; cycle_year: number } }).committees?.name ?? cm.committee_id}
+                    {' '}({(cm as { committees?: { name: string; cycle_year: number } }).committees?.cycle_year})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowAddCommittee(!showAddCommittee)}
+                className="text-xs text-navy underline mt-1"
+              >
+                + Add a committee
+              </button>
+              {showAddCommittee && (
+                <div className="mt-2 p-3 border border-gray-200 rounded-md bg-gray-50 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Committee name (e.g. Friends of Jane Smith)"
+                    value={newCommitteeName}
+                    onChange={(e) => setNewCommitteeName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                  <select
+                    value={newCommitteeYear}
+                    onChange={(e) => setNewCommitteeYear(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    {Array.from({ length: 13 }, (_, i) => 2024 - i).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <Button type="button" size="sm" onClick={handleAddCommittee} disabled={addingCommittee}>
+                    {addingCommittee ? 'Adding...' : 'Add Committee'}
+                  </Button>
+                </div>
               )}
               {errors.committee_id && (
                 <p className="text-xs text-red-600 mt-1">{errors.committee_id.message}</p>
@@ -363,8 +407,8 @@ export default function NewReviewPage() {
               size="lg"
               className="w-full"
               onClick={() => {
-                if (!watch('firm_id')) {
-                  setError('Please select a firm before continuing.');
+                if (!watch('firm_id') || !watch('committee_id')) {
+                  setError('Please select a firm and committee before continuing.');
                   return;
                 }
                 setError(null);
