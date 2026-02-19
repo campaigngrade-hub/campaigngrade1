@@ -37,7 +37,7 @@ export default function SignupPage() {
   async function onSubmit(data: FormData) {
     setError(null);
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
@@ -49,6 +49,15 @@ export default function SignupPage() {
     if (authError) {
       setError(authError.message);
       return;
+    }
+
+    // Belt-and-suspenders: upsert profile directly in case trigger timing is off
+    if (authData.user) {
+      await supabase.from('profiles').upsert({
+        id: authData.user.id,
+        email: data.email,
+        full_name: data.full_name,
+      }, { onConflict: 'id' });
     }
 
     setSuccess(true);
