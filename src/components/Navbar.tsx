@@ -15,8 +15,7 @@ export default function Navbar() {
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/');
-    router.refresh();
+    window.location.href = '/';
   }
 
   return (
@@ -42,9 +41,14 @@ export default function Navbar() {
                 {profile ? (
                   <>
                     {profile.role === 'platform_admin' && (
-                      <Link href="/admin" className="hover:text-amber-300 transition-colors">
-                        Admin
-                      </Link>
+                      <>
+                        <Link href="/admin" className="hover:text-amber-300 transition-colors">
+                          Admin
+                        </Link>
+                        <Link href="/dashboard" className="hover:text-amber-300 transition-colors">
+                          Dashboard
+                        </Link>
+                      </>
                     )}
                     {profile.role === 'firm_admin' && (
                       <Link href="/firm-dashboard" className="hover:text-amber-300 transition-colors">
@@ -56,7 +60,7 @@ export default function Navbar() {
                         Dashboard
                       </Link>
                     )}
-                    {profile.is_verified && profile.role === 'reviewer' && (
+                    {profile.is_verified && (
                       <Link href="/reviews/new">
                         <Button variant="secondary" size="sm">
                           Rate a Firm
@@ -77,7 +81,7 @@ export default function Navbar() {
                     </Link>
                     <Link href="/signup">
                       <Button variant="secondary" size="sm">
-                        Rate a Firm
+                        Get Started
                       </Button>
                     </Link>
                   </>
@@ -109,6 +113,9 @@ export default function Navbar() {
             <Link href="/about" className="block py-2 hover:text-amber-300">About</Link>
             {profile ? (
               <>
+                {profile.role === 'platform_admin' && (
+                  <Link href="/admin" className="block py-2 hover:text-amber-300">Admin</Link>
+                )}
                 <Link href="/dashboard" className="block py-2 hover:text-amber-300">Dashboard</Link>
                 {profile.is_verified && (
                   <Link href="/reviews/new" className="block py-2 text-amber-300">Rate a Firm</Link>
@@ -118,7 +125,7 @@ export default function Navbar() {
             ) : (
               <>
                 <Link href="/login" className="block py-2 hover:text-amber-300">Sign In</Link>
-                <Link href="/signup" className="block py-2 text-amber-300">Rate a Firm</Link>
+                <Link href="/signup" className="block py-2 text-amber-300">Get Started</Link>
               </>
             )}
           </div>
