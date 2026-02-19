@@ -24,6 +24,7 @@ import { Firm, CommitteeMember } from '@/types';
 
 const schema = z.object({
   firm_id: z.string().uuid('Please select a firm'),
+  firm_contact_email: z.string().email('Please enter a valid email for the firm'),
   committee_id: z.string().uuid('Please select a committee'),
   rating_overall: z.number().int().min(1, 'Overall rating is required').max(5),
   rating_communication: z.number().int().min(1).max(5).optional(),
@@ -34,7 +35,7 @@ const schema = z.object({
   review_text: z.string().min(50, 'Review must be at least 50 characters').max(5000),
   pros: z.string().max(1000).optional(),
   cons: z.string().max(1000).optional(),
-  cycle_year: z.number().int().min(2000).max(2030),
+  cycle_year: z.number().int().min(2000).max(2040),
   race_type: z.string().min(1, 'Race type is required'),
   region: z.string().optional(),
   budget_tier: z.string().optional(),
@@ -45,6 +46,11 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
+
+const CYCLE_YEARS = Array.from({ length: 29 }, (_, i) => {
+  const year = 2040 - i;
+  return { value: String(year), label: String(year) };
+});
 
 export default function NewReviewPage() {
   const router = useRouter();
@@ -113,8 +119,15 @@ export default function NewReviewPage() {
       .insert({ name: newCommitteeName.trim(), cycle_year: parseInt(newCommitteeYear) })
       .select().single();
     if (cErr || !committee) { setAddingCommittee(false); return; }
-    await supabase.from('committee_members').insert({ profile_id: profile.id, committee_id: committee.id, role_on_committee: 'other_senior_staff' });
-    const { data: refreshed } = await supabase.from('committee_members').select('*, committees(name, cycle_year)').eq('profile_id', profile.id);
+    await supabase.from('committee_members').insert({
+      profile_id: profile.id,
+      committee_id: committee.id,
+      role_on_committee: 'other_senior_staff',
+    });
+    const { data: refreshed } = await supabase
+      .from('committee_members')
+      .select('*, committees(name, cycle_year)')
+      .eq('profile_id', profile.id);
     setCommittees(refreshed as typeof committees ?? []);
     setValue('committee_id', committee.id);
     setShowAddCommittee(false);
@@ -122,9 +135,14 @@ export default function NewReviewPage() {
     setAddingCommittee(false);
   }
 
-  if (loading) return <div className="flex items-center justify-center min-h-64"><div className="text-gray-500">Loading...</div></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-64">
+      <div className="text-gray-500">Loading...</div>
+    </div>
+  );
 
   if (!profile) { router.push('/login'); return null; }
+
   if (!profile.is_verified) {
     return (
       <div className="max-w-2xl mx-auto py-12 px-4">
@@ -158,6 +176,13 @@ export default function NewReviewPage() {
 
   async function onSubmit(data: FormData) {
     setError(null);
+
+    if (!invoiceFile) {
+      setError('Please upload an invoice or contract to verify your engagement.');
+      setStep(4);
+      return;
+    }
+
     const supabase = createClient();
 
     // Check duplicate
@@ -170,11 +195,11 @@ export default function NewReviewPage() {
       .single();
 
     if (existing) {
-      setError(`You've already reviewed this firm for the ${data.cycle_year} cycle. You can edit your existing review.`);
+      setError(`You've already reviewed this firm for the ${data.cycle_year} cycle.`);
       return;
     }
 
-    // Check committee cap (max 3 reviews from same committee for same firm+cycle)
+    // Check committee cap
     const { count } = await supabase
       .from('reviews')
       .select('id', { count: 'exact' })
@@ -187,7 +212,7 @@ export default function NewReviewPage() {
       return;
     }
 
-    // Rate limiting: max 10 reviews in 30 days
+    // Rate limiting
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const { count: recentCount } = await supabase
@@ -201,17 +226,26 @@ export default function NewReviewPage() {
       return;
     }
 
-    // Handle invoice upload
-    let hasInvoice = false;
-    if (invoiceFile) {
-      const ext = invoiceFile.name.split('.').pop();
-      const path = `${profile!.id}/review-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('verification-evidence')
-        .upload(path, invoiceFile);
-      if (!uploadError) hasInvoice = true;
+    // Upload invoice (required)
+    const ext = invoiceFile.name.split('.').pop();
+    const path = `${profile!.id}/review-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('verification-evidence')
+      .upload(path, invoiceFile);
+
+    if (uploadError) {
+      setError('Failed to upload invoice: ' + uploadError.message);
+      return;
     }
 
+    // Save firm contact email (only if not already set)
+    await supabase
+      .from('firms')
+      .update({ contact_email: data.firm_contact_email })
+      .eq('id', data.firm_id)
+      .is('contact_email', null);
+
+    // Insert review
     const { error: insertError } = await supabase.from('reviews').insert({
       reviewer_id: profile!.id,
       firm_id: data.firm_id,
@@ -233,7 +267,7 @@ export default function NewReviewPage() {
       would_hire_again: data.would_hire_again,
       race_outcome: data.race_outcome ?? null,
       anonymization_level: data.anonymization_level,
-      has_invoice_evidence: hasInvoice,
+      has_invoice_evidence: true,
       status: 'pending',
     });
 
@@ -242,13 +276,19 @@ export default function NewReviewPage() {
       return;
     }
 
+    // Notify firm via API route
+    await fetch('/api/notify-firm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firmName: selectedFirm?.name,
+        firmSlug: selectedFirm?.slug,
+        firmEmail: data.firm_contact_email,
+      }),
+    });
+
     router.push('/dashboard?review=submitted');
   }
-
-  const CYCLE_YEARS = Array.from({ length: 13 }, (_, i) => {
-    const year = 2012 + i;
-    return { value: String(year), label: String(year) };
-  }).reverse();
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
@@ -283,7 +323,7 @@ export default function NewReviewPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        {/* Step 1: Firm selection */}
+        {/* Step 1: Firm + committee */}
         {step === 1 && (
           <Card className="space-y-4">
             <h2 className="font-semibold text-navy text-lg">Which firm are you reviewing?</h2>
@@ -305,6 +345,8 @@ export default function NewReviewPage() {
                       onClick={() => {
                         setSelectedFirm(firm);
                         setValue('firm_id', firm.id);
+                        const contactEmail = (firm as Firm & { contact_email?: string }).contact_email;
+                        if (contactEmail) setValue('firm_contact_email', contactEmail);
                         setFirmSearch(firm.name);
                         setFirmResults([]);
                       }}
@@ -351,6 +393,16 @@ export default function NewReviewPage() {
               </div>
             )}
 
+            <Input
+              id="firm_contact_email"
+              label="Firm's contact email"
+              type="email"
+              placeholder="contact@firmname.com"
+              helpText="We'll notify the firm that a review was posted so they can claim their profile."
+              error={errors.firm_contact_email?.message}
+              {...register('firm_contact_email')}
+            />
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Which committee was this for?
@@ -370,7 +422,7 @@ export default function NewReviewPage() {
               <button
                 type="button"
                 onClick={() => setShowAddCommittee(!showAddCommittee)}
-                className="text-xs text-navy underline mt-1"
+                className="text-xs text-navy underline mt-1 block"
               >
                 + Add a committee
               </button>
@@ -388,7 +440,7 @@ export default function NewReviewPage() {
                     onChange={(e) => setNewCommitteeYear(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   >
-                    {Array.from({ length: 13 }, (_, i) => 2024 - i).map(y => (
+                    {Array.from({ length: 29 }, (_, i) => 2040 - i).map(y => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
@@ -407,10 +459,9 @@ export default function NewReviewPage() {
               size="lg"
               className="w-full"
               onClick={() => {
-                if (!watch('firm_id') || !watch('committee_id')) {
-                  setError('Please select a firm and committee before continuing.');
-                  return;
-                }
+                if (!watch('firm_id')) { setError('Please select a firm.'); return; }
+                if (!watch('firm_contact_email')) { setError("Please enter the firm's contact email."); return; }
+                if (!watch('committee_id')) { setError('Please select a committee.'); return; }
                 setError(null);
                 setStep(2);
               }}
@@ -448,10 +499,7 @@ export default function NewReviewPage() {
             <div className="flex gap-3">
               <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>
               <Button type="button" size="lg" className="flex-1" onClick={() => {
-                if (!watch('rating_overall')) {
-                  setError('Please provide an overall rating.');
-                  return;
-                }
+                if (!watch('rating_overall')) { setError('Please provide an overall rating.'); return; }
                 setError(null);
                 setStep(3);
               }}>
@@ -557,6 +605,11 @@ export default function NewReviewPage() {
             <div className="flex gap-3">
               <Button type="button" variant="outline" onClick={() => setStep(2)}>Back</Button>
               <Button type="button" size="lg" className="flex-1" onClick={() => {
+                if (!watch('review_text') || (watch('review_text') ?? '').length < 50) {
+                  setError('Review must be at least 50 characters.');
+                  return;
+                }
+                if (!watch('race_type')) { setError('Please select a race type.'); return; }
                 setError(null);
                 setStep(4);
               }}>
@@ -566,10 +619,10 @@ export default function NewReviewPage() {
           </Card>
         )}
 
-        {/* Step 4: Review and submit */}
+        {/* Step 4: Invoice + submit */}
         {step === 4 && (
           <Card className="space-y-4">
-            <h2 className="font-semibold text-navy text-lg">Review & Submit</h2>
+            <h2 className="font-semibold text-navy text-lg">Verify Your Engagement & Submit</h2>
 
             <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm">
               <h3 className="font-semibold text-amber-900 mb-2">Content Guidelines Reminder</h3>
@@ -583,7 +636,7 @@ export default function NewReviewPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Upload invoice for &quot;Verified Engagement&quot; badge (optional)
+                Upload invoice or contract <span className="text-red-500">*</span>
               </label>
               <input
                 type="file"
@@ -591,17 +644,17 @@ export default function NewReviewPage() {
                 onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-navy file:text-white hover:file:bg-navy-dark"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Adding a verified invoice earns a &quot;Verified Engagement&quot; badge on your review.
+              <p className="text-xs text-gray-500 mt-1">
+                Required. Verifies your paid engagement with this firm and earns the{' '}
+                <strong>Verified Engagement</strong> badge. Accepted: PDF, JPG, PNG.
               </p>
             </div>
 
             <div className="border-t pt-4">
               <p className="text-sm text-gray-600 mb-4">
-                Your review will be submitted for moderation. It will be published within 24–48 hours
+                Your review will be submitted for moderation and published within 24–48 hours
                 if it meets our content guidelines.
               </p>
-
               <div className="flex gap-3">
                 <Button type="button" variant="outline" onClick={() => setStep(3)}>Back</Button>
                 <Button type="submit" size="lg" className="flex-1" disabled={isSubmitting}>
