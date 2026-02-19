@@ -21,7 +21,7 @@ export default async function DashboardPage() {
 
   // If profile missing, create it on the fly then continue
   if (!profile) {
-    const { createClient: createAdminClient } = await import('@/lib/supabase/admin');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
     const admin = createAdminClient();
     await admin.from('profiles').upsert({
       id: user.id,
