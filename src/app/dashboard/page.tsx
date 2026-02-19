@@ -1,11 +1,13 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { StarRatingDisplay } from '@/components/StarRating';
 import { formatDate } from '@/lib/utils';
+import type { Profile } from '@/types';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -13,15 +15,14 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single();
 
-  // If profile missing, create it on the fly then continue
+  // If profile missing, create it via admin client (bypasses RLS)
   if (!profile) {
-    const { createAdminClient } = await import('@/lib/supabase/admin');
     const admin = createAdminClient();
     await admin.from('profiles').upsert({
       id: user.id,
@@ -29,7 +30,13 @@ export default async function DashboardPage() {
       full_name: user.user_metadata?.full_name ?? '',
       role: 'reviewer',
     }, { onConflict: 'id' });
-    redirect('/dashboard');
+    const { data: newProfile } = await admin
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    if (!newProfile) redirect('/login');
+    profile = newProfile;
   }
 
   const { data: reviews } = await supabase
@@ -48,14 +55,16 @@ export default async function DashboardPage() {
     return <Badge variant={map[status] ?? 'default'}>{status}</Badge>;
   };
 
+  const p = profile as Profile;
+
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-navy">Dashboard</h1>
-          <p className="text-gray-500 mt-1">Welcome, {profile.full_name}</p>
+          <p className="text-gray-500 mt-1">Welcome, {p.full_name}</p>
         </div>
-        {profile.is_verified && (
+        {p.is_verified && (
           <Link href="/reviews/new">
             <Button variant="secondary">+ Rate a Firm</Button>
           </Link>
@@ -68,20 +77,20 @@ export default async function DashboardPage() {
           <div>
             <h2 className="font-semibold text-navy text-lg">Verification Status</h2>
             <div className="flex items-center gap-2 mt-2">
-              {profile.verification_status === 'approved' ? (
+              {p.verification_status === 'approved' ? (
                 <Badge variant="success">Verified Campaign Principal</Badge>
-              ) : profile.verification_status === 'pending' ? (
+              ) : p.verification_status === 'pending' ? (
                 <>
                   <Badge variant="warning">Pending Review</Badge>
                   <span className="text-sm text-gray-500">
                     Your submission is under review. You&apos;ll be notified within 48 hours.
                   </span>
                 </>
-              ) : profile.verification_status === 'rejected' ? (
+              ) : p.verification_status === 'rejected' ? (
                 <>
                   <Badge variant="danger">Verification Rejected</Badge>
-                  {profile.verification_notes && (
-                    <span className="text-sm text-gray-500">Reason: {profile.verification_notes}</span>
+                  {p.verification_notes && (
+                    <span className="text-sm text-gray-500">Reason: {p.verification_notes}</span>
                   )}
                 </>
               ) : (
@@ -89,10 +98,10 @@ export default async function DashboardPage() {
               )}
             </div>
           </div>
-          {profile.verification_status !== 'approved' && (
+          {p.verification_status !== 'approved' && (
             <Link href="/verify">
               <Button variant="outline" size="sm">
-                {profile.verification_status === 'rejected' ? 'Resubmit' : 'Get Verified'}
+                {p.verification_status === 'rejected' ? 'Resubmit' : 'Get Verified'}
               </Button>
             </Link>
           )}
@@ -109,7 +118,7 @@ export default async function DashboardPage() {
           <Card>
             <div className="text-center py-8">
               <p className="text-gray-500 mb-4">You haven&apos;t submitted any reviews yet.</p>
-              {profile.is_verified ? (
+              {p.is_verified ? (
                 <Link href="/reviews/new">
                   <Button variant="secondary">Submit Your First Review</Button>
                 </Link>
