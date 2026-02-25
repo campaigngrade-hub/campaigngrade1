@@ -2,7 +2,8 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = 'CampaignGrade <noreply@campaign-grade.com>';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://campaigngrade.com';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://campaigngrade1.vercel.app';
+const ADMIN_EMAIL = 'admin@campaign-grade.com';
 
 export async function sendVerificationApproved(email: string, name: string) {
   try {
@@ -37,7 +38,7 @@ export async function sendVerificationRejected(
         <p>We were unable to verify your submission for the following reason:</p>
         <blockquote>${reason}</blockquote>
         <p>You can resubmit with additional documentation at <a href="${APP_URL}/verify">${APP_URL}/verify</a></p>
-        <p>If you have questions, contact us at admin@campaigngrade.com.</p>
+        <p>If you have questions, contact us at ${ADMIN_EMAIL}.</p>
       `,
     });
   } catch (err) {
@@ -79,7 +80,7 @@ export async function sendReviewRemoved(
         <p>Your review of <strong>${firmName}</strong> has been removed for the following reason:</p>
         <blockquote>${reason}</blockquote>
         <p>Please review our <a href="${APP_URL}/content-policy">content policy</a> for guidelines.</p>
-        <p>If you believe this decision was in error, contact us at admin@campaigngrade.com.</p>
+        <p>If you believe this decision was in error, contact us at ${ADMIN_EMAIL}.</p>
       `,
     });
   } catch (err) {
@@ -100,7 +101,8 @@ export async function sendNewReviewNotification(
       html: `
         <h2>New Review on CampaignGrade</h2>
         <p>A new review has been posted for <strong>${firmName}</strong>.</p>
-        <p><a href="${APP_URL}/firm-dashboard/reviews">View and respond to the review</a></p>
+        <p><a href="${APP_URL}/firms/${firmSlug}">View the review</a></p>
+        <p><a href="${APP_URL}/firm-dashboard/reviews">Respond in your firm dashboard</a></p>
       `,
     });
   } catch (err) {

@@ -56,9 +56,9 @@ export async function POST(req: NextRequest) {
               Create an Account to Claim
             </a>
           </p>
-          <p style="margin-top: 24px;">To claim your firm profile or learn more, visit <a href="${APP_URL}">${APP_URL}</a> or contact us at <a href="mailto:admin@campaigngrade.com">admin@campaigngrade.com</a>.</p>
+          <p style="margin-top: 24px;">To claim your firm profile or learn more, visit <a href="${APP_URL}">${APP_URL}</a> or contact us at <a href="mailto:admin@campaign-grade.com">admin@campaign-grade.com</a>.</p>
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-          <p style="color: #6b7280; font-size: 12px;">You received this email because your firm was reviewed on CampaignGrade. If you believe this was in error, please contact admin@campaigngrade.com.</p>
+          <p style="color: #6b7280; font-size: 12px;">You received this email because your firm was reviewed on CampaignGrade. If you believe this was in error, please contact admin@campaign-grade.com.</p>
         </div>
       `,
     });
