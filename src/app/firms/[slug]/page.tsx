@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import Link from 'next/link';
 import { Review } from '@/types';
 import { getServiceLabel } from '@/lib/utils';
-import { RATING_CATEGORIES, PRICE_TIERS } from '@/lib/constants';
+import { RATING_CATEGORIES } from '@/lib/constants';
 import FirmPageClient from './FirmPageClient';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +22,12 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
     .select('*')
     .eq('slug', slug)
     .single();
+
+  const { data: pricing } = await supabase
+    .from('firm_pricing')
+    .select('*')
+    .eq('firm_id', firm?.id ?? '')
+    .order('service');
 
   if (!firm) notFound();
 
@@ -84,14 +90,6 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
                   {firm.website.replace(/^https?:\/\//, '')}
                 </a>
               )}
-              {firm.pricing_tier && (
-                <span className="font-medium">
-                  {PRICE_TIERS.find((t) => t.value === firm.pricing_tier)?.symbol}
-                  <span className="font-normal text-gray-400 ml-1">
-                    · {PRICE_TIERS.find((t) => t.value === firm.pricing_tier)?.label.split('·')[1]?.trim()}
-                  </span>
-                </span>
-              )}
               {firm.headquarters_state && (
                 <span>Based in {firm.headquarters_state}</span>
               )}
@@ -119,6 +117,26 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
           </div>
         )}
       </Card>
+
+      {/* Pricing table */}
+      {pricing && pricing.length > 0 && (
+        <Card className="mb-6">
+          <h2 className="font-semibold text-navy mb-3">Pricing</h2>
+          <div className="divide-y divide-gray-100">
+            {pricing.map((p: { id: string; service: string; price: number; price_type: string }) => (
+              <div key={p.id} className="flex items-center justify-between py-2">
+                <span className="text-sm text-gray-700">{getServiceLabel(p.service)}</span>
+                <span className="text-sm font-medium text-navy">
+                  ${p.price.toLocaleString()}
+                  <span className="ml-1 text-xs font-normal text-gray-400">
+                    / {p.price_type === 'one_time' ? 'one-time' : p.price_type === 'monthly' ? 'mo' : 'contingency'}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Rating summary */}
       {published.length > 0 && (

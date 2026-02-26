@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import FirmCard from '@/components/FirmCard';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
-import { SERVICE_CATEGORIES, PRICE_TIERS } from '@/lib/constants';
+import { SERVICE_CATEGORIES } from '@/lib/constants';
 import { Firm } from '@/types';
 
 type FirmWithStats = Firm & {
@@ -19,7 +19,7 @@ interface Props {
   initialParams: {
     q?: string;
     service?: string;
-    pricing?: string;
+    has_pricing?: string;
     min_rating?: string;
     sort?: string;
   };
@@ -70,13 +70,15 @@ export default function FirmDirectoryClient({ firms, initialParams }: Props) {
           onChange={(e) => updateParam('service', e.target.value)}
         />
 
-        <Select
-          id="pricing"
-          options={PRICE_TIERS as unknown as { value: string; label: string }[]}
-          placeholder="All price tiers"
-          value={initialParams.pricing ?? ''}
-          onChange={(e) => updateParam('pricing', e.target.value)}
-        />
+        <label className="flex items-center gap-2 cursor-pointer self-end pb-2">
+          <input
+            type="checkbox"
+            checked={initialParams.has_pricing === '1'}
+            onChange={(e) => updateParam('has_pricing', e.target.checked ? '1' : '')}
+            className="rounded border-gray-300 text-navy focus:ring-navy"
+          />
+          <span className="text-sm text-gray-700">Has public pricing</span>
+        </label>
 
         <Select
           id="min_rating"
@@ -95,8 +97,6 @@ export default function FirmDirectoryClient({ firms, initialParams }: Props) {
           options={[
             { value: 'rating', label: 'Highest rated' },
             { value: 'reviews', label: 'Most reviewed' },
-            { value: 'price_asc', label: 'Price: low to high' },
-            { value: 'price_desc', label: 'Price: high to low' },
             { value: 'name', label: 'Alphabetical' },
           ]}
           placeholder="Sort by..."

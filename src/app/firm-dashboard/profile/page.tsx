@@ -12,18 +12,32 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import Card from '@/components/ui/Card';
-import { SERVICE_CATEGORIES, US_STATES, PRICE_TIERS } from '@/lib/constants';
+import { SERVICE_CATEGORIES, US_STATES } from '@/lib/constants';
 import { Firm } from '@/types';
 
 const schema = z.object({
   description: z.string().max(1000).optional(),
   website: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
-  pricing_tier: z.string().optional(),
   year_founded: z.string().optional(),
   headquarters_state: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
+
+type PriceType = 'monthly' | 'one_time' | 'contingency';
+
+interface PricingRow {
+  id?: string;          // existing DB row id
+  service: string;
+  price: string;        // kept as string for input control
+  price_type: PriceType;
+}
+
+const PRICE_TYPE_LABELS: Record<PriceType, string> = {
+  monthly: 'Monthly',
+  one_time: 'One-time',
+  contingency: 'Contingency',
+};
 
 export default function FirmProfileEditPage() {
   const router = useRouter();
@@ -35,6 +49,7 @@ export default function FirmProfileEditPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [pricingRows, setPricingRows] = useState<PricingRow[]>([]);
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -51,10 +66,25 @@ export default function FirmProfileEditPage() {
         reset({
           description: data.description ?? '',
           website: data.website ?? '',
-          pricing_tier: data.pricing_tier ?? '',
           year_founded: data.year_founded ? String(data.year_founded) : '',
           headquarters_state: data.headquarters_state ?? '',
         });
+        // Load existing pricing rows
+        supabase
+          .from('firm_pricing')
+          .select('*')
+          .eq('firm_id', data.id)
+          .order('created_at')
+          .then(({ data: pricing }) => {
+            if (pricing && pricing.length > 0) {
+              setPricingRows(pricing.map((p) => ({
+                id: p.id,
+                service: p.service,
+                price: String(p.price),
+                price_type: p.price_type as PriceType,
+              })));
+            }
+          });
       }
     });
   }, [profile, reset]);
@@ -74,12 +104,45 @@ export default function FirmProfileEditPage() {
     setError(null);
   }
 
+  function addPricingRow() {
+    setPricingRows((prev) => [...prev, { service: '', price: '', price_type: 'one_time' }]);
+  }
+
+  function removePricingRow(index: number) {
+    setPricingRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updatePricingRow(index: number, field: keyof PricingRow, value: string) {
+    setPricingRows((prev) => prev.map((row, i) =>
+      i === index ? { ...row, [field]: value } : row
+    ));
+  }
+
+  async function savePricing(firmId: string) {
+    const supabase = createClient();
+    // Delete all existing rows and re-insert (simplest conflict-free approach)
+    await supabase.from('firm_pricing').delete().eq('firm_id', firmId);
+
+    const validRows = pricingRows.filter(
+      (r) => r.service && r.price && !isNaN(Number(r.price)) && Number(r.price) > 0
+    );
+    if (validRows.length === 0) return;
+
+    await supabase.from('firm_pricing').insert(
+      validRows.map((r) => ({
+        firm_id: firmId,
+        service: r.service,
+        price: Number(r.price),
+        price_type: r.price_type,
+      }))
+    );
+  }
+
   async function onSubmit(data: FormData) {
     setError(null);
     const supabase = createClient();
     let logo_url = firm!.logo_url;
 
-    // Upload logo if a new one was selected
     if (logoFile) {
       setUploadingLogo(true);
       const ext = logoFile.name.split('.').pop();
@@ -104,7 +167,6 @@ export default function FirmProfileEditPage() {
       .update({
         description: data.description || null,
         website: data.website || null,
-        pricing_tier: data.pricing_tier || null,
         year_founded: data.year_founded ? parseInt(data.year_founded) : null,
         headquarters_state: data.headquarters_state || null,
         services: selectedServices,
@@ -113,6 +175,9 @@ export default function FirmProfileEditPage() {
       .eq('id', firm!.id);
 
     if (updateError) { setError(updateError.message); return; }
+
+    await savePricing(firm!.id);
+
     setSuccess(true);
     setTimeout(() => router.push('/firm-dashboard'), 1500);
   }
@@ -204,29 +269,20 @@ export default function FirmProfileEditPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Select
-              id="pricing_tier"
-              label="Pricing tier"
-              options={PRICE_TIERS as unknown as { value: string; label: string }[]}
-              placeholder="Select..."
-              helpText="Publicly visible — helps campaigns budget."
-              {...register('pricing_tier')}
-            />
-            <Select
               id="headquarters_state"
               label="Headquarters state"
               options={US_STATES as unknown as { value: string; label: string }[]}
               placeholder="Select..."
               {...register('headquarters_state')}
             />
+            <Input
+              id="year_founded"
+              label="Year founded"
+              type="number"
+              placeholder="e.g. 2010"
+              {...register('year_founded')}
+            />
           </div>
-
-          <Input
-            id="year_founded"
-            label="Year founded"
-            type="number"
-            placeholder="e.g. 2010"
-            {...register('year_founded')}
-          />
         </Card>
 
         {/* Services */}
@@ -246,6 +302,81 @@ export default function FirmProfileEditPage() {
               </label>
             ))}
           </div>
+        </Card>
+
+        {/* Pricing */}
+        <Card className="mb-6">
+          <h2 className="font-semibold text-navy mb-1">Public Pricing</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Optionally list prices for your services. These are displayed publicly on your profile and help campaigns budget. Leave blank to not display pricing.
+          </p>
+
+          {pricingRows.length > 0 && (
+            <div className="space-y-3 mb-4">
+              {/* Header row */}
+              <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 px-1">
+                <span className="col-span-5">Service</span>
+                <span className="col-span-3">Price (USD)</span>
+                <span className="col-span-3">Billing type</span>
+                <span className="col-span-1" />
+              </div>
+              {pricingRows.map((row, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-5">
+                    <select
+                      value={row.service}
+                      onChange={(e) => updatePricingRow(i, 'service', e.target.value)}
+                      className="w-full rounded-md border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy"
+                    >
+                      <option value="">Select service…</option>
+                      {SERVICE_CATEGORIES.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        placeholder="0"
+                        value={row.price}
+                        onChange={(e) => updatePricingRow(i, 'price', e.target.value)}
+                        className="w-full rounded-md border border-gray-300 text-sm pl-5 pr-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-span-3">
+                    <select
+                      value={row.price_type}
+                      onChange={(e) => updatePricingRow(i, 'price_type', e.target.value)}
+                      className="w-full rounded-md border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy"
+                    >
+                      {(Object.keys(PRICE_TYPE_LABELS) as PriceType[]).map((t) => (
+                        <option key={t} value={t}>{PRICE_TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => removePricingRow(i)}
+                      className="text-gray-400 hover:text-red-500 transition-colors text-lg leading-none"
+                      title="Remove row"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Button type="button" variant="outline" size="sm" onClick={addPricingRow}>
+            + Add pricing row
+          </Button>
         </Card>
 
         <div className="flex gap-3">
