@@ -40,7 +40,7 @@ export default async function AdminDashboardPage() {
 
   const totals = [
     { label: 'Total Firms', value: totalFirms ?? 0, href: '/admin/firms' },
-    { label: 'Total Reviews', value: totalReviews ?? 0, href: '/admin/reviews' },
+    { label: 'Total Reviews', value: totalReviews ?? 0, href: '/admin/reviews/all' },
     { label: 'Total Users', value: totalUsers ?? 0, href: '/admin/users' },
   ];
 
