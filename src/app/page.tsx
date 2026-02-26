@@ -38,6 +38,12 @@ export default async function HomePage() {
       {/* Hero */}
       <section className="bg-navy text-white py-20 px-4">
         <div className="max-w-5xl mx-auto text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="CampaignGrade"
+            className="h-24 w-auto mx-auto mb-8"
+          />
           <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
             The review platform political campaigns trust
           </h1>
