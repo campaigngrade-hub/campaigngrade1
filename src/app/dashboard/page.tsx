@@ -124,23 +124,6 @@ export default async function DashboardPage({
         </div>
       </Card>
 
-      {/* Claim a firm CTA — only for non-firm admins */}
-      {p.role !== 'firm_admin' && p.role !== 'platform_admin' && (
-        <Card className="mb-6 border-blue-200 bg-blue-50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-navy text-lg">Are you a consulting firm?</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Claim your firm profile to respond to reviews and manage your listing.
-              </p>
-            </div>
-            <Link href="/firms">
-              <Button variant="outline" size="sm">Find &amp; Claim Your Firm</Button>
-            </Link>
-          </div>
-        </Card>
-      )}
-
       {/* Reviews */}
       <div>
         <h2 className="font-semibold text-navy text-lg mb-4">
