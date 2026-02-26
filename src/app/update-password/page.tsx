@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -28,6 +28,20 @@ export default function UpdatePasswordPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  // Guard: verify there is an active recovery session.
+  // If someone navigates here directly without a valid reset link, kick them out.
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        router.replace('/login?error=Invalid+or+expired+reset+link.+Please+request+a+new+one.');
+      } else {
+        setChecking(false);
+      }
+    });
+  }, [router]);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -38,9 +52,14 @@ export default function UpdatePasswordPage() {
     const supabase = createClient();
     const { error: updateError } = await supabase.auth.updateUser({ password: data.password });
     if (updateError) { setError(updateError.message); return; }
+    // Sign out immediately after password update so the recovery session
+    // does not persist as a full login session.
+    await supabase.auth.signOut();
     setSuccess(true);
-    setTimeout(() => router.push('/dashboard'), 2000);
+    setTimeout(() => router.push('/login'), 2000);
   }
+
+  if (checking) return null;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4">
@@ -51,7 +70,7 @@ export default function UpdatePasswordPage() {
         <Card>
           {success ? (
             <div className="text-center py-4">
-              <p className="text-green-700 font-medium">Password updated! Redirecting to dashboard…</p>
+              <p className="text-green-700 font-medium">Password updated! Redirecting to login…</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
