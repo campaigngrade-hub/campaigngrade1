@@ -84,8 +84,8 @@ export default function ContentPolicyPage() {
         <h2 className="text-xl font-bold text-navy mb-4">Appeals</h2>
         <p className="text-gray-700 leading-relaxed">
           If your review was rejected and you believe it complies with this policy, contact us at{' '}
-          <a href="mailto:admin@campaigngrade.com" className="text-navy hover:underline">
-            admin@campaigngrade.com
+          <a href="mailto:admin@campaign-grade.com" className="text-navy hover:underline">
+            admin@campaign-grade.com
           </a>{' '}
           with your account email and the firm you reviewed. We will review your appeal within 5 business days.
         </p>

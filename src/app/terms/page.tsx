@@ -106,8 +106,8 @@ export default function TermsPage() {
           <h2 className="text-xl font-bold text-navy mb-2">11. Contact</h2>
           <p>
             Questions about these Terms? Contact us at{' '}
-            <a href="mailto:admin@campaigngrade.com" className="text-navy hover:underline">
-              admin@campaigngrade.com
+            <a href="mailto:admin@campaign-grade.com" className="text-navy hover:underline">
+              admin@campaign-grade.com
             </a>
           </p>
         </section>

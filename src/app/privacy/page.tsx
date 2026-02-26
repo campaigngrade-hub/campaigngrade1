@@ -74,7 +74,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold text-navy mb-2">7. Data Retention</h2>
           <p>
             Account data is retained as long as your account is active. You may request account
-            deletion at any time by contacting admin@campaigngrade.com. Published reviews associated
+            deletion at any time by contacting admin@campaign-grade.com. Published reviews associated
             with your account will be anonymized (reviewer ID removed) upon account deletion.
             Verification evidence is deleted within 90 days regardless.
           </p>
@@ -93,8 +93,8 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold text-navy mb-2">9. Contact</h2>
           <p>
             Privacy questions or requests:{' '}
-            <a href="mailto:admin@campaigngrade.com" className="text-navy hover:underline">
-              admin@campaigngrade.com
+            <a href="mailto:admin@campaign-grade.com" className="text-navy hover:underline">
+              admin@campaign-grade.com
             </a>
           </p>
         </section>
