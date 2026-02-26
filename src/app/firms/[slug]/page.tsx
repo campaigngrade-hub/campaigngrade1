@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import Link from 'next/link';
 import { Review } from '@/types';
 import { getServiceLabel } from '@/lib/utils';
-import { RATING_CATEGORIES } from '@/lib/constants';
+import { RATING_CATEGORIES, PRICE_TIERS } from '@/lib/constants';
 import FirmPageClient from './FirmPageClient';
 
 export const dynamic = 'force-dynamic';
@@ -84,8 +84,13 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
                   {firm.website.replace(/^https?:\/\//, '')}
                 </a>
               )}
-              {firm.party_focus && (
-                <span className="capitalize">{firm.party_focus}</span>
+              {firm.pricing_tier && (
+                <span className="font-medium">
+                  {PRICE_TIERS.find((t) => t.value === firm.pricing_tier)?.symbol}
+                  <span className="font-normal text-gray-400 ml-1">
+                    · {PRICE_TIERS.find((t) => t.value === firm.pricing_tier)?.label.split('·')[1]?.trim()}
+                  </span>
+                </span>
               )}
               {firm.headquarters_state && (
                 <span>Based in {firm.headquarters_state}</span>

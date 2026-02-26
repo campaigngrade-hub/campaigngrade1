@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Firm } from '@/types';
 import { getServiceLabel } from '@/lib/utils';
+import { PRICE_TIERS } from '@/lib/constants';
 import { StarRatingDisplay } from './StarRating';
 import Badge from './ui/Badge';
 import Card from './ui/Card';
@@ -55,8 +56,13 @@ export default function FirmCard({ firm }: FirmCardProps) {
           </div>
         )}
 
-        {firm.party_focus && (
-          <p className="text-xs text-gray-400 mt-2 capitalize">{firm.party_focus}</p>
+        {firm.pricing_tier && (
+          <p className="text-xs text-gray-500 mt-2 font-medium">
+            {PRICE_TIERS.find((t) => t.value === firm.pricing_tier)?.symbol ?? ''}
+            <span className="text-gray-400 font-normal ml-1">
+              · {PRICE_TIERS.find((t) => t.value === firm.pricing_tier)?.label.split('·')[1]?.trim() ?? ''}
+            </span>
+          </p>
         )}
       </Card>
     </Link>

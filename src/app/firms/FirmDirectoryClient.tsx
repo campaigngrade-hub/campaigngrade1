@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import FirmCard from '@/components/FirmCard';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
-import { SERVICE_CATEGORIES, PARTY_FOCUS } from '@/lib/constants';
+import { SERVICE_CATEGORIES, PRICE_TIERS } from '@/lib/constants';
 import { Firm } from '@/types';
 
 type FirmWithStats = Firm & {
@@ -19,7 +19,7 @@ interface Props {
   initialParams: {
     q?: string;
     service?: string;
-    party?: string;
+    pricing?: string;
     min_rating?: string;
     sort?: string;
   };
@@ -71,11 +71,11 @@ export default function FirmDirectoryClient({ firms, initialParams }: Props) {
         />
 
         <Select
-          id="party"
-          options={PARTY_FOCUS as unknown as { value: string; label: string }[]}
-          placeholder="All parties"
-          value={initialParams.party ?? ''}
-          onChange={(e) => updateParam('party', e.target.value)}
+          id="pricing"
+          options={PRICE_TIERS as unknown as { value: string; label: string }[]}
+          placeholder="All price tiers"
+          value={initialParams.pricing ?? ''}
+          onChange={(e) => updateParam('pricing', e.target.value)}
         />
 
         <Select
@@ -95,6 +95,8 @@ export default function FirmDirectoryClient({ firms, initialParams }: Props) {
           options={[
             { value: 'rating', label: 'Highest rated' },
             { value: 'reviews', label: 'Most reviewed' },
+            { value: 'price_asc', label: 'Price: low to high' },
+            { value: 'price_desc', label: 'Price: high to low' },
             { value: 'name', label: 'Alphabetical' },
           ]}
           placeholder="Sort by..."

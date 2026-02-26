@@ -12,13 +12,13 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import Card from '@/components/ui/Card';
-import { PARTY_FOCUS, SERVICE_CATEGORIES, US_STATES } from '@/lib/constants';
+import { SERVICE_CATEGORIES, US_STATES, PRICE_TIERS } from '@/lib/constants';
 import { Firm } from '@/types';
 
 const schema = z.object({
   description: z.string().max(1000).optional(),
   website: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
-  party_focus: z.string().optional(),
+  pricing_tier: z.string().optional(),
   year_founded: z.string().optional(),
   headquarters_state: z.string().optional(),
 });
@@ -51,7 +51,7 @@ export default function FirmProfileEditPage() {
         reset({
           description: data.description ?? '',
           website: data.website ?? '',
-          party_focus: data.party_focus ?? '',
+          pricing_tier: data.pricing_tier ?? '',
           year_founded: data.year_founded ? String(data.year_founded) : '',
           headquarters_state: data.headquarters_state ?? '',
         });
@@ -104,7 +104,7 @@ export default function FirmProfileEditPage() {
       .update({
         description: data.description || null,
         website: data.website || null,
-        party_focus: data.party_focus || null,
+        pricing_tier: data.pricing_tier || null,
         year_founded: data.year_founded ? parseInt(data.year_founded) : null,
         headquarters_state: data.headquarters_state || null,
         services: selectedServices,
@@ -204,11 +204,12 @@ export default function FirmProfileEditPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Select
-              id="party_focus"
-              label="Party focus"
-              options={PARTY_FOCUS as unknown as { value: string; label: string }[]}
+              id="pricing_tier"
+              label="Pricing tier"
+              options={PRICE_TIERS as unknown as { value: string; label: string }[]}
               placeholder="Select..."
-              {...register('party_focus')}
+              helpText="Publicly visible — helps campaigns budget."
+              {...register('pricing_tier')}
             />
             <Select
               id="headquarters_state"

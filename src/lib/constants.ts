@@ -61,6 +61,13 @@ export const PARTY_FOCUS = [
   { value: 'nonpartisan', label: 'Nonpartisan' },
 ] as const;
 
+export const PRICE_TIERS = [
+  { value: 'budget', label: '$  · Budget-friendly', symbol: '$' },
+  { value: 'mid', label: '$$  · Mid-range', symbol: '$$' },
+  { value: 'premium', label: '$$$  · Premium', symbol: '$$$' },
+  { value: 'enterprise', label: '$$$$  · Enterprise', symbol: '$$$$' },
+] as const;
+
 export const RACE_OUTCOMES = [
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },

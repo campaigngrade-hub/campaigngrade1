@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export default async function FirmsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; service?: string; party?: string; min_rating?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; service?: string; pricing?: string; min_rating?: string; sort?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -22,8 +22,8 @@ export default async function FirmsPage({
   if (params.service) {
     query = query.contains('services', [params.service]);
   }
-  if (params.party) {
-    query = query.eq('party_focus', params.party);
+  if (params.pricing) {
+    query = query.eq('pricing_tier', params.pricing);
   }
 
   const { data: firms } = await query;
@@ -55,6 +55,7 @@ export default async function FirmsPage({
       return true;
     })
     .sort((a, b) => {
+      const priceOrder = ['budget', 'mid', 'premium', 'enterprise'];
       switch (params.sort) {
         case 'rating':
           return (b.avg_rating ?? 0) - (a.avg_rating ?? 0);
@@ -62,6 +63,10 @@ export default async function FirmsPage({
           return b.review_count - a.review_count;
         case 'name':
           return a.name.localeCompare(b.name);
+        case 'price_asc':
+          return (priceOrder.indexOf(a.pricing_tier ?? '') ?? 99) - (priceOrder.indexOf(b.pricing_tier ?? '') ?? 99);
+        case 'price_desc':
+          return (priceOrder.indexOf(b.pricing_tier ?? '') ?? 99) - (priceOrder.indexOf(a.pricing_tier ?? '') ?? 99);
         default:
           return (b.avg_rating ?? 0) - (a.avg_rating ?? 0);
       }

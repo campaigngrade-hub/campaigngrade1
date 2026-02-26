@@ -28,6 +28,8 @@ export type BudgetTier =
 
 export type PartyFocus = 'democratic' | 'republican' | 'bipartisan' | 'nonpartisan';
 
+export type PricingTier = 'budget' | 'mid' | 'premium' | 'enterprise';
+
 export type CommitteeRole =
   | 'candidate'
   | 'campaign_manager'
@@ -104,6 +106,7 @@ export interface Firm {
   is_claimed: boolean;
   claimed_by: string | null;
   party_focus: PartyFocus | null;
+  pricing_tier: PricingTier | null;
   year_founded: number | null;
   headquarters_state: string | null;
   created_at: string;
