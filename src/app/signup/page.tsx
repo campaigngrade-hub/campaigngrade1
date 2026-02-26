@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,8 +23,9 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function SignupPage() {
-  const router = useRouter();
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get('next') ?? '';
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -42,7 +43,9 @@ export default function SignupPage() {
       password: data.password,
       options: {
         data: { full_name: data.full_name },
-        emailRedirectTo: `${window.location.origin}/verify`,
+        emailRedirectTo: next
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+          : `${window.location.origin}/verify`,
       },
     });
 
@@ -65,30 +68,94 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4">
-        <div className="w-full max-w-md text-center">
-          <Card>
-            <div className="py-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-navy mb-2">Check your email</h2>
-              <p className="text-gray-600 mb-4">
-                We sent a confirmation link to your email address. Click it to confirm your account,
-                then you&apos;ll be redirected to the verification flow.
-              </p>
-              <Link href="/login" className="text-navy font-medium hover:underline">
-                Back to sign in
-              </Link>
-            </div>
-          </Card>
+      <Card>
+        <div className="py-4 text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-navy mb-2">Check your email</h2>
+          <p className="text-gray-600 mb-4">
+            We sent a confirmation link to your email address. Click it to confirm your account
+            {next ? ' and you\u2019ll be taken directly to claim your firm.' : ', then you\u2019ll be redirected to the verification flow.'}
+          </p>
+          <Link href="/login" className="text-navy font-medium hover:underline">
+            Back to sign in
+          </Link>
         </div>
-      </div>
+      </Card>
     );
   }
 
+  return (
+    <Card>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-md px-4 py-3 text-sm">
+            {error}
+          </div>
+        )}
+
+        <Input
+          id="full_name"
+          label="Full name"
+          type="text"
+          autoComplete="name"
+          placeholder="Jane Smith"
+          error={errors.full_name?.message}
+          {...register('full_name')}
+        />
+
+        <Input
+          id="email"
+          label="Email address"
+          type="email"
+          autoComplete="email"
+          placeholder="you@campaign.com"
+          error={errors.email?.message}
+          {...register('email')}
+        />
+
+        <Input
+          id="password"
+          label="Password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="••••••••"
+          helpText="At least 8 characters, with a letter and number"
+          error={errors.password?.message}
+          {...register('password')}
+        />
+
+        {next ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+            <strong>Claiming a firm?</strong> After creating your account and confirming your email,
+            you&apos;ll be taken directly to the firm claim page to submit your verification documents.
+          </div>
+        ) : (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm text-blue-800">
+            <strong>Who can sign up?</strong> CampaignGrade is for verified campaign principals —
+            candidates, campaign managers, treasurers, and finance directors who directly hired
+            consulting firms.
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating account...' : 'Create Account'}
+        </Button>
+
+        <p className="text-xs text-gray-500 text-center">
+          By signing up, you agree to our{' '}
+          <Link href="/terms" className="underline">Terms of Service</Link> and{' '}
+          <Link href="/privacy" className="underline">Privacy Policy</Link>.
+        </p>
+      </form>
+    </Card>
+  );
+}
+
+export default function SignupPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
@@ -101,63 +168,9 @@ export default function SignupPage() {
             </Link>
           </p>
         </div>
-
-        <Card>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 rounded-md px-4 py-3 text-sm">
-                {error}
-              </div>
-            )}
-
-            <Input
-              id="full_name"
-              label="Full name"
-              type="text"
-              autoComplete="name"
-              placeholder="Jane Smith"
-              error={errors.full_name?.message}
-              {...register('full_name')}
-            />
-
-            <Input
-              id="email"
-              label="Email address"
-              type="email"
-              autoComplete="email"
-              placeholder="you@campaign.com"
-              error={errors.email?.message}
-              {...register('email')}
-            />
-
-            <Input
-              id="password"
-              label="Password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="••••••••"
-              helpText="At least 8 characters, with a letter and number"
-              error={errors.password?.message}
-              {...register('password')}
-            />
-
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm text-blue-800">
-              <strong>Who can sign up?</strong> CampaignGrade is for verified campaign principals —
-              candidates, campaign managers, treasurers, and finance directors who directly hired
-              consulting firms.
-            </div>
-
-            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating account...' : 'Create Account'}
-            </Button>
-
-            <p className="text-xs text-gray-500 text-center">
-              By signing up, you agree to our{' '}
-              <Link href="/terms" className="underline">Terms of Service</Link> and{' '}
-              <Link href="/privacy" className="underline">Privacy Policy</Link>.
-            </p>
-          </form>
-        </Card>
+        <Suspense fallback={<Card><div className="py-8 text-center text-gray-400">Loading…</div></Card>}>
+          <SignupForm />
+        </Suspense>
       </div>
     </div>
   );

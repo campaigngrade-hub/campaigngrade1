@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
                style="display: inline-block; background: #f59e0b; color: #1e3a5f; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-right: 12px;">
               View Your Firm Profile
             </a>
-            <a href="${APP_URL}/signup"
+            <a href="${APP_URL}/signup?next=${encodeURIComponent(`/claim/${firmSlug}`)}"
                style="display: inline-block; background: #1e3a5f; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
               Create an Account to Claim
             </a>
