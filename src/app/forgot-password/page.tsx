@@ -29,8 +29,9 @@ export default function ForgotPasswordPage() {
   async function onSubmit(data: FormData) {
     setError(null);
     const supabase = createClient();
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://campaign-grade.com';
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(data.email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
+      redirectTo: `${APP_URL}/auth/callback?next=/update-password`,
     });
 
     if (resetError) {
