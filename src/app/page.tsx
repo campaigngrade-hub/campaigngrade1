@@ -40,7 +40,7 @@ export default async function HomePage() {
         <div className="max-w-5xl mx-auto text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.png"
+            src="/logowhite.png"
             alt="CampaignGrade"
             className="h-24 w-auto mx-auto mb-8"
           />

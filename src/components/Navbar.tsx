@@ -25,7 +25,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="CampaignGrade" className="h-8 w-auto" />
+            <img src="/logowhite.png" alt="CampaignGrade" className="h-8 w-auto" />
           </Link>
 
           {/* Desktop nav */}
