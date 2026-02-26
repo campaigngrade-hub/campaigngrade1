@@ -106,7 +106,7 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
           <div className="mt-4 pt-4 border-t border-gray-100">
             <p className="text-sm text-gray-500">
               Is this your firm?{' '}
-              <Link href="/signup" className="text-navy font-medium hover:underline">
+              <Link href={`/claim/${firm.slug}`} className="text-navy font-medium hover:underline">
                 Claim this profile
               </Link>{' '}
               to respond to reviews and update your listing.

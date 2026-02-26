@@ -20,6 +20,7 @@ export default async function AdminDashboardPage() {
     { count: pendingVerifications },
     { count: pendingReviews },
     { count: pendingFlags },
+    { count: pendingClaims },
     { count: totalFirms },
     { count: totalReviews },
     { count: totalUsers },
@@ -27,6 +28,7 @@ export default async function AdminDashboardPage() {
     adminClient.from('verification_submissions').select('id', { count: 'exact' }).eq('status', 'pending'),
     adminClient.from('reviews').select('id', { count: 'exact' }).eq('status', 'pending'),
     adminClient.from('review_flags').select('id', { count: 'exact' }).eq('status', 'pending'),
+    adminClient.from('firm_claim_requests').select('id', { count: 'exact' }).eq('status', 'pending'),
     adminClient.from('firms').select('id', { count: 'exact' }),
     adminClient.from('reviews').select('id', { count: 'exact' }),
     adminClient.from('profiles').select('id', { count: 'exact' }),
@@ -36,6 +38,7 @@ export default async function AdminDashboardPage() {
     { label: 'Pending Verifications', value: pendingVerifications ?? 0, href: '/admin/verifications', urgent: (pendingVerifications ?? 0) > 0 },
     { label: 'Pending Reviews', value: pendingReviews ?? 0, href: '/admin/reviews', urgent: (pendingReviews ?? 0) > 0 },
     { label: 'Pending Flags', value: pendingFlags ?? 0, href: '/admin/flags', urgent: (pendingFlags ?? 0) > 0 },
+    { label: 'Firm Claim Requests', value: pendingClaims ?? 0, href: '/admin/claims', urgent: (pendingClaims ?? 0) > 0 },
   ];
 
   const totals = [
@@ -49,7 +52,7 @@ export default async function AdminDashboardPage() {
       <h1 className="text-2xl font-bold text-navy mb-8">Admin Dashboard</h1>
 
       <h2 className="font-semibold text-navy mb-4">Action Required</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
         {stats.map((stat) => (
           <Link key={stat.label} href={stat.href}>
             <Card className={`hover:shadow-md transition-shadow cursor-pointer ${stat.urgent ? 'border-amber-400' : ''}`}>
@@ -80,6 +83,7 @@ export default async function AdminDashboardPage() {
           { label: 'Verification Queue', href: '/admin/verifications' },
           { label: 'Review Moderation', href: '/admin/reviews' },
           { label: 'Flag Queue', href: '/admin/flags' },
+          { label: 'Firm Claims', href: '/admin/claims' },
           { label: 'Manage Firms', href: '/admin/firms' },
           { label: 'Manage Users', href: '/admin/users' },
         ].map((link) => (
