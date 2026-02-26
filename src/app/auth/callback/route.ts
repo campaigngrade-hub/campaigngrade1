@@ -5,11 +5,22 @@ export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/dashboard';
+  const error = searchParams.get('error');
+  const errorDescription = searchParams.get('error_description');
 
+  // If Supabase returned an error, show it on the login page
+  if (error) {
+    const message = errorDescription ?? error;
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(message)}`
+    );
+  }
+
+  // PKCE code flow (used by password reset and magic links)
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (!exchangeError) {
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

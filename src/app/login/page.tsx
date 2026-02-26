@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,9 +18,11 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const urlError = searchParams.get('error');
+  const [error, setError] = useState<string | null>(urlError);
 
   const {
     register,
@@ -45,6 +47,52 @@ export default function LoginPage() {
   }
 
   return (
+    <Card>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-md px-4 py-3 text-sm">
+            {error === 'auth_callback_failed'
+              ? 'Authentication failed. Please try again.'
+              : error}
+          </div>
+        )}
+
+        <Input
+          id="email"
+          label="Email address"
+          type="email"
+          autoComplete="email"
+          placeholder="you@campaign.com"
+          error={errors.email?.message}
+          {...register('email')}
+        />
+
+        <Input
+          id="password"
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          error={errors.password?.message}
+          {...register('password')}
+        />
+
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-sm text-navy hover:underline">
+            Forgot password?
+          </Link>
+        </div>
+
+        <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+          {isSubmitting ? 'Signing in...' : 'Sign In'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
@@ -56,46 +104,9 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-
-        <Card>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 rounded-md px-4 py-3 text-sm">
-                {error}
-              </div>
-            )}
-
-            <Input
-              id="email"
-              label="Email address"
-              type="email"
-              autoComplete="email"
-              placeholder="you@campaign.com"
-              error={errors.email?.message}
-              {...register('email')}
-            />
-
-            <Input
-              id="password"
-              label="Password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              error={errors.password?.message}
-              {...register('password')}
-            />
-
-            <div className="flex justify-end">
-              <Link href="/forgot-password" className="text-sm text-navy hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-
-            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
-              {isSubmitting ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </form>
-        </Card>
+        <Suspense fallback={<Card><div className="py-8 text-center text-gray-400">Loading…</div></Card>}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );
