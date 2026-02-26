@@ -25,13 +25,12 @@ export default function AdminVerificationQueue({ submissions }: { submissions: S
   const router = useRouter();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState<string | null>(null);
-  const [fileUrls, setFileUrls] = useState<Record<string, string>>({});
 
   async function getSignedUrl(submissionId: string, fileUrl: string) {
     const res = await fetch(`/api/admin/verifications/signed-url?file=${encodeURIComponent(fileUrl)}`);
     const data = await res.json();
     if (data.url) {
-      setFileUrls((prev) => ({ ...prev, [submissionId]: data.url }));
+      window.open(data.url, '_blank');
     }
   }
 
@@ -102,23 +101,13 @@ export default function AdminVerificationQueue({ submissions }: { submissions: S
 
           {sub.file_url && (
             <div className="mb-4">
-              {fileUrls[sub.id] ? (
-                <a
-                  href={fileUrls[sub.id]}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-navy underline"
-                >
-                  View uploaded evidence
-                </a>
-              ) : (
-                <button
-                  className="text-sm text-navy underline"
-                  onClick={() => getSignedUrl(sub.id, sub.file_url!)}
-                >
-                  Load evidence file
-                </button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => getSignedUrl(sub.id, sub.file_url!)}
+              >
+                View Verification Document
+              </Button>
             </div>
           )}
 

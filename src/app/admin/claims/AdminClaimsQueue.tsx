@@ -28,7 +28,7 @@ export default function AdminClaimsQueue({ claims }: { claims: ClaimRequest[] })
   const [docUrls, setDocUrls] = useState<Record<string, string>>({});
 
   async function getDocUrl(claimId: string, docPath: string) {
-    const res = await fetch(`/api/admin/verifications/signed-url?path=${encodeURIComponent(docPath)}`);
+    const res = await fetch(`/api/admin/verifications/signed-url?file=${encodeURIComponent(docPath)}`);
     const data = await res.json();
     if (data.url) {
       setDocUrls((prev) => ({ ...prev, [claimId]: data.url }));
