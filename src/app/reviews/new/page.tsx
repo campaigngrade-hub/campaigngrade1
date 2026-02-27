@@ -144,20 +144,6 @@ export default function NewReviewPage() {
 
   if (!profile) { router.push('/login'); return null; }
 
-  if (!profile.is_verified) {
-    return (
-      <div className="max-w-2xl mx-auto py-12 px-4">
-        <Card>
-          <div className="text-center py-8">
-            <h2 className="text-xl font-bold text-navy mb-2">Verification Required</h2>
-            <p className="text-gray-500 mb-4">You must be a verified campaign principal to submit reviews.</p>
-            <Button onClick={() => router.push('/verify')}>Get Verified</Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
   const ratingField = (key: keyof FormData, label: string, required = false) => (
     <Controller
       key={key}

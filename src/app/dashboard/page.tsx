@@ -80,49 +80,10 @@ export default async function DashboardPage({
           <h1 className="text-2xl font-bold text-navy">Dashboard</h1>
           <p className="text-gray-500 mt-1">Welcome, {p.full_name}</p>
         </div>
-        {p.is_verified && (
-          <Link href="/reviews/new">
-            <Button variant="secondary">+ Rate a Firm</Button>
-          </Link>
-        )}
+        <Link href="/reviews/new">
+          <Button variant="secondary">+ Rate a Firm</Button>
+        </Link>
       </div>
-
-      {/* Verification status */}
-      <Card className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-navy text-lg">Verification Status</h2>
-            <div className="flex items-center gap-2 mt-2">
-              {p.verification_status === 'approved' ? (
-                <Badge variant="success">Verified Campaign Principal</Badge>
-              ) : p.verification_status === 'pending' ? (
-                <>
-                  <Badge variant="warning">Pending Review</Badge>
-                  <span className="text-sm text-gray-500">
-                    Your submission is under review. You&apos;ll be notified within 48 hours.
-                  </span>
-                </>
-              ) : p.verification_status === 'rejected' ? (
-                <>
-                  <Badge variant="danger">Verification Rejected</Badge>
-                  {p.verification_notes && (
-                    <span className="text-sm text-gray-500">Reason: {p.verification_notes}</span>
-                  )}
-                </>
-              ) : (
-                <Badge variant="default">Not Verified</Badge>
-              )}
-            </div>
-          </div>
-          {p.verification_status !== 'approved' && (
-            <Link href="/verify">
-              <Button variant="outline" size="sm">
-                {p.verification_status === 'rejected' ? 'Resubmit' : 'Get Verified'}
-              </Button>
-            </Link>
-          )}
-        </div>
-      </Card>
 
       {/* Reviews */}
       <div>
@@ -134,15 +95,9 @@ export default async function DashboardPage({
           <Card>
             <div className="text-center py-8">
               <p className="text-gray-500 mb-4">You haven&apos;t submitted any reviews yet.</p>
-              {p.is_verified ? (
-                <Link href="/reviews/new">
-                  <Button variant="secondary">Submit Your First Review</Button>
-                </Link>
-              ) : (
-                <p className="text-sm text-gray-400">
-                  Complete verification to start reviewing firms.
-                </p>
-              )}
+              <Link href="/reviews/new">
+                <Button variant="secondary">Submit Your First Review</Button>
+              </Link>
             </div>
           </Card>
         ) : (
