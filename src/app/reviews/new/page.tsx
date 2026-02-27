@@ -317,11 +317,8 @@ export default function NewReviewPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            firmName: selectedFirm?.name,
-            firmSlug: selectedFirm?.slug,
             firmEmail: data.firm_contact_email,
             firmId: data.firm_id,
-            saveOnly: true, // just save contact_email, don't send notification
           }),
         });
       }

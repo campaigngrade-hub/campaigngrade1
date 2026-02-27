@@ -33,7 +33,14 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
 
   const { data: reviews } = await supabase
     .from('reviews')
-    .select('*, firm_responses(*)')
+    .select(`
+      id, firm_id, rating_overall, rating_communication, rating_budget_transparency,
+      rating_results_vs_projections, rating_responsiveness, rating_strategic_quality,
+      review_text, pros, cons, cycle_year, race_type, region, budget_tier,
+      services_used, would_hire_again, race_outcome, anonymization_level,
+      created_at, status,
+      firm_responses(id, response_text, created_at, status)
+    `)
     .eq('firm_id', firm.id)
     .eq('status', 'published')
     .order('created_at', { ascending: false });
@@ -210,7 +217,7 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
           </div>
         </Card>
       ) : (
-        <FirmPageClient reviews={published as Review[]} firmId={firm.id} />
+        <FirmPageClient reviews={published as unknown as Review[]} firmId={firm.id} />
       )}
     </div>
   );

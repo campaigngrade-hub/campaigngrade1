@@ -3,6 +3,15 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendReviewPublished, sendReviewRemoved } from '@/lib/email';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -56,17 +65,19 @@ export async function POST(req: NextRequest) {
   // On publish: notify the firm that a review is now live
   if (action === 'publish' && firmEmail && firmName) {
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://campaign-grade.com';
+    const safeFirmName = escapeHtml(firmName);
+    const safeFirmSlug = encodeURIComponent(firmSlug);
     const { Resend } = await import('resend');
     const resend = new Resend(process.env.RESEND_API_KEY);
     try {
       await resend.emails.send({
         from: 'CampaignGrade <noreply@campaign-grade.com>',
         to: firmEmail,
-        subject: `${firmName} just received a review on CampaignGrade`,
+        subject: `${safeFirmName} just received a review on CampaignGrade`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
             <h2 style="color: #1e3a5f;">Your firm was just reviewed on CampaignGrade</h2>
-            <p>A verified campaign principal has submitted a review of <strong>${firmName}</strong> on CampaignGrade — the trusted platform for political professionals to evaluate consulting firms.</p>
+            <p>A verified campaign principal has submitted a review of <strong>${safeFirmName}</strong> on CampaignGrade — the trusted platform for political professionals to evaluate consulting firms.</p>
             <p>CampaignGrade helps political campaigns make informed decisions about their vendors. Firm profiles include ratings on communication, value, results, and more.</p>
             <h3 style="color: #1e3a5f;">Claim your firm profile</h3>
             <p>As a firm representative, you can:</p>
@@ -76,11 +87,11 @@ export async function POST(req: NextRequest) {
               <li>Showcase your work to potential clients</li>
             </ul>
             <p>
-              <a href="${APP_URL}/firms/${firmSlug}"
+              <a href="${APP_URL}/firms/${safeFirmSlug}"
                  style="display: inline-block; background: #f59e0b; color: #1e3a5f; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-right: 12px;">
                 View Your Firm Profile
               </a>
-              <a href="${APP_URL}/signup?next=${encodeURIComponent(`/claim/${firmSlug}`)}"
+              <a href="${APP_URL}/signup?next=${encodeURIComponent(`/claim/${safeFirmSlug}`)}"
                  style="display: inline-block; background: #1e3a5f; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
                 Create an Account to Claim
               </a>

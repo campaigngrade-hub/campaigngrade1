@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  // Validate next param to prevent open redirect — must be a relative path
+  const rawNext = searchParams.get('next') ?? '/dashboard';
+  const next = rawNext.startsWith('/') && !rawNext.includes('://') ? rawNext : '/dashboard';
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
