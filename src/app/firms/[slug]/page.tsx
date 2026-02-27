@@ -38,6 +38,7 @@ export default async function FirmProfilePage({ params }: { params: Promise<{ sl
       rating_results_vs_projections, rating_responsiveness, rating_strategic_quality,
       review_text, pros, cons, cycle_year, race_type, region, budget_tier,
       services_used, would_hire_again, race_outcome, anonymization_level,
+      has_invoice_evidence, invoice_verified_by,
       created_at, status,
       firm_responses(id, response_text, created_at, status)
     `)
