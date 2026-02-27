@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { firmName, firmSlug, firmEmail, firmId } = await req.json();
+  const { firmName, firmSlug, firmEmail, firmId, saveOnly } = await req.json();
 
   if (!firmEmail || !firmName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
       .update({ contact_email: firmEmail })
       .eq('id', firmId)
       .is('contact_email', null); // Only set if not already set
+  }
+
+  // saveOnly = true means just persist the email, don't send notification yet
+  // (notification fires when admin publishes the review)
+  if (saveOnly) {
+    return NextResponse.json({ success: true });
   }
 
   try {

@@ -299,6 +299,8 @@ export default function NewReviewPage() {
         race_outcome: data.race_outcome ?? null,
         anonymization_level: data.anonymization_level,
         has_invoice_evidence: true,
+        invoice_path: path,
+        firm_contact_email_submitted: data.firm_contact_email,
         status: 'pending',
       });
 
@@ -308,17 +310,21 @@ export default function NewReviewPage() {
         return;
       }
 
-      // Save firm contact email via API (uses admin client, bypasses RLS)
-      await fetch('/api/notify-firm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firmName: selectedFirm?.name,
-          firmSlug: selectedFirm?.slug,
-          firmEmail: data.firm_contact_email,
-          firmId: data.firm_id,
-        }),
-      });
+      // Save firm contact email on the firm record (no notification email yet —
+      // that fires when admin publishes the review)
+      if (data.firm_id && data.firm_contact_email) {
+        await fetch('/api/notify-firm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firmName: selectedFirm?.name,
+            firmSlug: selectedFirm?.slug,
+            firmEmail: data.firm_contact_email,
+            firmId: data.firm_id,
+            saveOnly: true, // just save contact_email, don't send notification
+          }),
+        });
+      }
 
       router.push('/dashboard?review=submitted');
     } catch (err) {

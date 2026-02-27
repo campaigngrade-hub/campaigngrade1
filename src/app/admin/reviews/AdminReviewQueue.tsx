@@ -21,6 +21,7 @@ interface AdminReview {
   region: string | null;
   budget_tier: string | null;
   would_hire_again: boolean;
+  invoice_path: string | null;
   created_at: string;
   firms: { name: string; slug: string } | null;
   profiles: { full_name: string; email: string; is_verified: boolean; verification_status: string } | null;
@@ -30,6 +31,13 @@ export default function AdminReviewQueue({ reviews }: { reviews: AdminReview[] }
   const router = useRouter();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState<string | null>(null);
+
+  async function viewDocument(invoicePath: string) {
+    const res = await fetch(`/api/admin/verifications/signed-url?file=${encodeURIComponent(invoicePath)}`);
+    const data = await res.json();
+    if (data.url) window.open(data.url, '_blank');
+    else alert('Could not load document.');
+  }
 
   async function handleAction(reviewId: string, action: 'publish' | 'remove') {
     setProcessing(reviewId);
@@ -81,6 +89,18 @@ export default function AdminReviewQueue({ reviews }: { reviews: AdminReview[] }
             {review.pros && <p className="text-sm text-green-700 mt-2"><strong>Pros:</strong> {review.pros}</p>}
             {review.cons && <p className="text-sm text-red-700 mt-1"><strong>Cons:</strong> {review.cons}</p>}
           </div>
+
+          {review.invoice_path && (
+            <div className="mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => viewDocument(review.invoice_path!)}
+              >
+                📄 View Verification Document
+              </Button>
+            </div>
+          )}
 
           <Textarea
             label="Admin notes"
