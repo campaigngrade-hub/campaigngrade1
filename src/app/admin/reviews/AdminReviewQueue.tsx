@@ -72,10 +72,10 @@ export default function AdminReviewQueue({ reviews }: { reviews: AdminReview[] }
                 By {review.profiles?.full_name} · {formatDate(review.created_at)}
               </p>
               <div className="flex gap-2 mt-1">
-                {review.profiles?.is_verified ? (
-                  <Badge variant="success">Verified Reviewer</Badge>
+                {review.invoice_path ? (
+                  <Badge variant="success">Invoice submitted</Badge>
                 ) : (
-                  <Badge variant="warning">Unverified Reviewer</Badge>
+                  <Badge variant="warning">No invoice on file</Badge>
                 )}
               </div>
             </div>
