@@ -128,7 +128,7 @@ export interface Review {
   race_type: RaceType;
   region: Region | null;
   budget_tier: BudgetTier | null;
-  service_used: string | null;
+  services_used: string[] | null;
   would_hire_again: boolean;
   race_outcome: RaceOutcome | null;
   anonymization_level: AnonymizationLevel;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -27,7 +27,6 @@ const schema = z.object({
   race_type: z.string().min(1),
   region: z.string().optional(),
   budget_tier: z.string().optional(),
-  service_used: z.string().optional(),
   would_hire_again: z.boolean(),
   race_outcome: z.string().optional(),
 });
@@ -37,6 +36,13 @@ type FormData = z.infer<typeof schema>;
 export default function EditReviewClient({ review }: { review: Review }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [servicesUsed, setServicesUsed] = useState<string[]>(review.services_used ?? []);
+
+  const toggleService = useCallback((value: string) => {
+    setServicesUsed(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    );
+  }, []);
 
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -53,7 +59,6 @@ export default function EditReviewClient({ review }: { review: Review }) {
       race_type: review.race_type,
       region: review.region ?? '',
       budget_tier: review.budget_tier ?? '',
-      service_used: review.service_used ?? '',
       would_hire_again: review.would_hire_again,
       race_outcome: review.race_outcome ?? '',
     },
@@ -64,7 +69,7 @@ export default function EditReviewClient({ review }: { review: Review }) {
     const supabase = createClient();
     const { error: updateError } = await supabase
       .from('reviews')
-      .update({ ...data, status: 'pending' })
+      .update({ ...data, services_used: servicesUsed.length > 0 ? servicesUsed : null, status: 'pending' })
       .eq('id', review.id);
 
     if (updateError) { setError(updateError.message); return; }
@@ -123,8 +128,23 @@ export default function EditReviewClient({ review }: { review: Review }) {
             <Select id="race_type" label="Race type" options={RACE_TYPES as unknown as { value: string; label: string }[]} error={errors.race_type?.message} {...register('race_type')} />
             <Select id="region" label="Region" options={REGIONS as unknown as { value: string; label: string }[]} placeholder="Select..." {...register('region')} />
             <Select id="budget_tier" label="Budget" options={BUDGET_TIERS as unknown as { value: string; label: string }[]} placeholder="Select..." {...register('budget_tier')} />
-            <Select id="service_used" label="Service used" options={SERVICE_CATEGORIES as unknown as { value: string; label: string }[]} placeholder="Select..." {...register('service_used')} />
             <Select id="race_outcome" label="Race outcome" options={RACE_OUTCOMES as unknown as { value: string; label: string }[]} placeholder="Select..." {...register('race_outcome')} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Services used (select all that apply)</label>
+            <div className="grid grid-cols-2 gap-2">
+              {SERVICE_CATEGORIES.map((cat) => (
+                <label key={cat.value} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={servicesUsed.includes(cat.value)}
+                    onChange={() => toggleService(cat.value)}
+                    className="rounded border-gray-300 text-navy focus:ring-navy"
+                  />
+                  {cat.label}
+                </label>
+              ))}
+            </div>
           </div>
           <Textarea id="review_text" label="Review" rows={6} error={errors.review_text?.message} {...register('review_text')} />
           <Textarea id="pros" label="Pros" rows={2} {...register('pros')} />

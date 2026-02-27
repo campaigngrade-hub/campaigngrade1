@@ -60,7 +60,7 @@ export default function ReviewCard({
       {/* Context line */}
       <p className="text-sm text-gray-500 mb-3">
         {getContextLine(review)}
-        {review.service_used && ` · ${review.service_used}`}
+        {review.services_used && review.services_used.length > 0 && ` · ${review.services_used.join(', ')}`}
       </p>
 
       {/* Would hire again */}

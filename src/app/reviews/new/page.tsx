@@ -39,7 +39,6 @@ const schema = z.object({
   race_type: z.string().min(1, 'Race type is required'),
   region: z.string().optional(),
   budget_tier: z.string().optional(),
-  service_used: z.string().optional(),
   would_hire_again: z.boolean(),
   race_outcome: z.string().optional(),
   anonymization_level: z.enum(['standard', 'minimal']),
@@ -68,6 +67,7 @@ export default function NewReviewPage() {
   const [newCommitteeYear, setNewCommitteeYear] = useState('2024');
   const [addingCommittee, setAddingCommittee] = useState(false);
   const [hireAgain, setHireAgain] = useState<boolean>(true);
+  const [servicesUsed, setServicesUsed] = useState<string[]>([]);
 
   const {
     register,
@@ -294,7 +294,7 @@ export default function NewReviewPage() {
         race_type: data.race_type,
         region: data.region ?? null,
         budget_tier: data.budget_tier ?? null,
-        service_used: data.service_used ?? null,
+        services_used: servicesUsed.length > 0 ? servicesUsed : null,
         would_hire_again: data.would_hire_again,
         race_outcome: data.race_outcome ?? null,
         anonymization_level: data.anonymization_level,
@@ -583,13 +583,28 @@ export default function NewReviewPage() {
               placeholder="Select..."
               {...register('budget_tier')}
             />
-            <Select
-              id="service_used"
-              label="Service used"
-              options={SERVICE_CATEGORIES as unknown as { value: string; label: string }[]}
-              placeholder="Select..."
-              {...register('service_used')}
-            />
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Services used (select all that apply)</label>
+              <div className="grid grid-cols-2 gap-2">
+                {SERVICE_CATEGORIES.map((cat) => (
+                  <label key={cat.value} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={servicesUsed.includes(cat.value)}
+                      onChange={(e) => {
+                        setServicesUsed(prev =>
+                          e.target.checked
+                            ? [...prev, cat.value]
+                            : prev.filter(v => v !== cat.value)
+                        );
+                      }}
+                      className="rounded border-gray-300 text-navy focus:ring-navy"
+                    />
+                    {cat.label}
+                  </label>
+                ))}
+              </div>
+            </div>
             <Select
               id="race_outcome"
               label="Race outcome"
